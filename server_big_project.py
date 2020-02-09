@@ -69,6 +69,68 @@ class Clients:
         return True
 
 
+
+def mss_screen():
+    """print("77")
+    common.picture_flag = 1
+    while common.picture_flag:
+        with mss() as sct:
+            rect = {'top': 0, 'left': 0, 'width': manager.WIDTH, 'height': manager.HEIGHT}
+            img = sct.grab(rect)
+        time.sleep(0.01)"""
+    pass
+            
+def control_mss(address):
+    with mss() as sct:
+        rect = {'top': 0, 'left': 0, 'width': manager.WIDTH, 'height': manager.HEIGHT}
+        img = sct.grab(rect)
+        pixels = compress(img.rgb, 6)
+        size = len(pixels)
+        size_len = (size.bit_length() + 7) // 8
+        size_bytes = size.to_bytes(size_len, 'big')
+        manager.server_socket.sendto(size_bytes, address)
+        sleep = False
+        if size > 200000:
+            sleep = True
+        while manager.max_bytes < len(pixels):
+            part_pixels = pixels[:manager.max_bytes]
+            manager.server_socket.sendto(part_pixels, address)
+            if sleep:
+                time.sleep(0.01)
+            pixels = pixels[manager.max_bytes:]
+        manager.server_socket.sendto(pixels, address)
+        if common.picture_flag == 1:
+            common.conn_q.put("send_screen")
+        time.sleep(0.01)
+
+def send_screen():
+        print("778")
+        # self.server_socket.sendto(screen_size.encode(), address)
+        start_ss = True
+        while True:
+            if common.conn_q.empty() == False:
+                data = common.conn_q.get()
+                if data == "send_screen":
+                    manager.server_socket.sendto("send_screen".encode(), manager.address)
+                    if start_ss == True:
+                        print("one")
+                        start_ss = False
+                        screen_size = "{},{}".format(manager.WIDTH, manager.HEIGHT)
+                        manager.server_socket.sendto(screen_size.encode(), manager.address)
+                    print("rrrr")
+                    control_mss(manager.address)
+                elif data == "send_stop":
+                    print(";;")
+                    manager.server_socket.sendto("send_stop".encode(), manager.address)
+                elif data == "lock":
+                    print("hdjkgd")
+                    manager.server_socket.sendto("lock_screen".encode(), manager.address)
+                elif data == "unlock":
+                    print("un")
+                    manager.server_socket.sendto("unlock_screen".encode(), manager.address)
+            time.sleep(0.01)
+
+
 """def broadcast(msg):
     Broadcasts a message to all the clients.
     for sock in clients:
@@ -101,15 +163,6 @@ def handle_client(client_socket):  # Takes client socket as argument.
 """
 
 
-def command_click():
-    if common.task_command == "send_screen":
-        gui_q()
-        manager.server_socket.sendto("send_screen".encode(), manager.address)
-        manager.send_screen(manager.address)
-    if common.task_command == "lock_screen":
-        manager.server_socket.sendto("lock_screen".encode(), manager.address)
-
-
 class Server(Thread):
     def __init__(self, max_bytes):
         Thread.__init__(self)
@@ -127,6 +180,8 @@ class Server(Thread):
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.server_socket.bind((self.server_ip, self.port))
         print('Listening at {}'.format(self.server_socket.getsockname()))
+        commThread = Thread(target=send_screen, args=())
+        commThread.start()
 
     def run(self):
         while True:
@@ -138,35 +193,9 @@ class Server(Thread):
             else:
                 """for i in clients:
                 s.sendto('{0} send {1}'.format(address, data) , i )"""
-                thread = Thread(target=self.send_screen())
-                thread.start()
             time.sleep(0.01)
 
-    def send_screen(self, address):
-        print("77")
-        with mss() as sct:
-            rect = {'top': 0, 'left': 0, 'width': self.WIDTH, 'height': self.HEIGHT}
-            screen_size = "{},{}".format(self.WIDTH, self.HEIGHT)
-            self.server_socket.sendto(screen_size.encode(), address)
-            print("22")
-            while True:
-                img = sct.grab(rect)
-                pixels = compress(img.rgb, 6)
-                size = len(pixels)
-                size_len = (size.bit_length() + 7) // 8
-                size_bytes = size.to_bytes(size_len, 'big')
-                self.server_socket.sendto(size_bytes, address)
-                sleep = False
-                if size > 200000:
-                    sleep = True
-                while self.max_bytes < len(pixels):
-                    part_pixels = pixels[:self.max_bytes]
-                    self.server_socket.sendto(part_pixels, address)
-                    if sleep:
-                        time.sleep(0.01)
-                    pixels = pixels[self.max_bytes:]
-                self.server_socket.sendto(pixels, address)
-                time.sleep(0.01)
+    
 
 
 def main():

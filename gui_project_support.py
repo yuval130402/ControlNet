@@ -8,6 +8,7 @@
 import sys
 import common
 import threading
+import time
 from threading import Thread
 import server_big_project
 try:
@@ -23,11 +24,15 @@ except ImportError:
     py3 = True
 
 def lock_button(p1):
-    common.task_command = "lock_screen"
+    # common.task_command = "lock_screen"
     # lock_thread = threading.Thread(target=server_big_project.command_click(), args=())
     # lock_thread.start()
     # sys.stdout.flush()
     common.conn_q.put("lock")
+
+def unlock_button(p1):
+    common.conn_q.put("unlock")
+    # sys.stdout.flush()
 
 def select_all_clients(p1):
     common.send_all = True
@@ -38,15 +43,20 @@ def send_file(p1):
     # sys.stdout.flush()
 
 def start_share_screen(p1):
-    common.task_command = "send_screen"
-    share_thread = threading.Thread(target=server_big_project.command_click(), args=())
-    share_thread.start()
+    
+    #mss_thread = threading.Thread(target=server_big_project.mss_screen, args=())
+    #mss_thread.start()
+    time.sleep(0.01)
+    common.conn_q.put("send_screen")
+    common.picture_flag = 1
     # server_big_project.command_click()
-    sys.stdout.flush()
+    # sys.stdout.flush()
 
 def stop_share_screen(p1):
-    print('gui_project_support.stop_share_screen')
-    sys.stdout.flush()
+    common.picture_flag = 0
+    time.sleep(0.01)
+    common.conn_q.put("send_stop")
+    # sys.stdout.flush()
 
 def turn_off(p1):
     print('gui_project_support.turn_off')
@@ -54,10 +64,6 @@ def turn_off(p1):
 
 def turn_on(p1):
     print('gui_project_support.turn_on')
-    sys.stdout.flush()
-
-def unlock_button(p1):
-    print('gui_project_support.unlock_button')
     sys.stdout.flush()
 
 def update_client_list(p1):
@@ -73,6 +79,9 @@ def init(top, gui, *args, **kwargs):
     w = gui
     top_level = top
     root = top
+    import server_big_project
+    main_connected = threading.Thread(target=server_big_project.main(), args=())
+    main_connected.start()
 
 def destroy_window():
     # Function which closes the window.
@@ -81,9 +90,6 @@ def destroy_window():
     top_level = None
 
 if __name__ == '__main__':
-    import server_big_project
-    main_connected = threading.Thread(target=server_big_project.main(), args=())
-    main_connected.start()
     import gui_project
     gui_project.vp_start_gui()
 
