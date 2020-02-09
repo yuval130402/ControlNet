@@ -10,11 +10,24 @@ from socket import socket
 import pythoncom, pyWinhook
 import socket
 import pygame
-import common
+import time
 
+from queue import Queue
+
+conn_q = Queue()
 MAX_BYTES = 65000
-SERVER_IP = '10.70.232.229'
+# SERVER_IP = '10.70.232.229'
+SERVER_IP = '192.168.0.109'
 SERVER_PORT = 9006
+
+
+def client_send():
+    while True:
+        if conn_q.empty() == False:
+            data = conn_q.get()
+            print("client_send:" + data)
+            client.socket_send(client.client_socket, data)
+        time.sleep(0.05)  # sleep a little before check the queue again
 
 
 class Client(Thread):
@@ -29,8 +42,8 @@ class Client(Thread):
         self.port = SERVER_PORT
         self.client_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
         self.client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        # self.send_thread = threading.Thread(target=self.open_window)
-        # self.send_thread.start()
+        send_thread = threading.Thread(target=client_send, args=())
+        send_thread.start()
 
     def socket_send(self, conn_socket, message):
         connection_address_port = (self.server_ip, self.port)
@@ -82,7 +95,9 @@ class Client(Thread):
                 except:
                     pass
         finally:
-            self.client_socket.close()
+            """self.client_socket.close()"""
+            pass
+
 
     def exb(self):
         pass
@@ -98,12 +113,16 @@ class Client(Thread):
         hm.HookKeyboard()
         pythoncom.PumpMessages()
 
+    def unlock_screen(self):
+        pass
 
     def command_response(self, command):
         if command == "send_screen":
             self.recieve_screen()
         if command == "lock_screen":
             self.lock_screen()
+        if command == "unlock_screen":
+            self.unlock_screen()
 
 
     def run(self):
