@@ -11,6 +11,7 @@ import pythoncom, pyWinhook
 import socket
 import pygame
 import time
+from pynput.mouse import Button, Controller as MouseController, Listener as MouseListener
 
 from queue import Queue
 
@@ -19,6 +20,37 @@ MAX_BYTES = 65000
 # SERVER_IP = '10.70.232.229'
 SERVER_IP = '192.168.0.109'
 SERVER_PORT = 9006
+SECONDARY_PORT = 9561
+
+
+def control_mouse(data):
+    if len(data) == 2:
+        x1, y1 = data
+        x, y = change_xy(x1, y1)
+        client.mouse.position = (int(x), int(y))
+
+
+def change_xy(x, y):
+    # adjust x and y size to the other computer size
+    x = int(x * prop_x)
+    y = int(y * prop_y)
+    return x, y
+
+
+def show_mouse():
+    while client.width == -1:  # wait for recieve_screen and then start the listeners
+        pass
+    global prop_x, prop_y
+    prop_x = client.width / client.WIDTH
+    prop_y = client.height / client.HEIGHT
+    mouse_client_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
+    mouse_client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+
+    while True:
+        data, address = mouse_client_socket.recvfrom(MAX_BYTES)
+        data = data.decode()
+        data = data.split(",")
+        control_mouse(data)
 
 
 def client_send():
@@ -35,11 +67,14 @@ class Client(Thread):
         Thread.__init__(self)
         user32 = ctypes.windll.user32
         user32.SetProcessDPIAware()
+        self.width = -1
+        self.height = -1
         self.WIDTH = user32.GetSystemMetrics(0)
         self.HEIGHT = user32.GetSystemMetrics(1)
         self.max_bytes = max_bytes
         self.server_ip = SERVER_IP
         self.port = SERVER_PORT
+        self.mouse = MouseController()
         self.client_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
         self.client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         send_thread = threading.Thread(target=client_send, args=())
@@ -66,13 +101,15 @@ class Client(Thread):
     def recieve_screen(self):
         data = self.socket_recv(self.client_socket, 1024).decode()
         print(data)
-        width, height = data.split(",")
-        width = int(width)
-        height = int(height)
+        self.width, self.height = data.split(",")
+        self.width = int(self.width)
+        self.height = int(self.height)
+        # open the window
         pygame.init()
         screen = pygame.display.set_mode((self.WIDTH, self.HEIGHT), pygame.FULLSCREEN)
         clock = pygame.time.Clock()
         watching = True
+        # print other computer screen
         try:
             while watching:
                 for event in pygame.event.get():
@@ -80,13 +117,13 @@ class Client(Thread):
                         watching = False
                         break
                 size = int.from_bytes(self.socket_recv(self.client_socket, self.max_bytes), byteorder='big')
-                while size > 10000000:
+                while size > 10000000:  # checks if it size and not part of the pixels
                     size = int.from_bytes(self.socket_recv(self.client_socket, self.max_bytes), byteorder='big')
                 temp_pixels = self.recvall(size)
                 try:
                     pixels = decompress(temp_pixels)
                     # Create the Surface from raw pixels
-                    img = pygame.image.fromstring(pixels, (width, height), 'RGB')
+                    img = pygame.image.fromstring(pixels, (self.width, self.height), 'RGB')
                     picture = pygame.transform.scale(img, (self.WIDTH, self.HEIGHT))
                     # Display the picture
                     screen.blit(picture, (0, 0))
@@ -98,40 +135,38 @@ class Client(Thread):
             """self.client_socket.close()"""
             pass
 
-
-    def exb(self):
-        pass
-
     def uMad(self, event):
         return False
 
-    def lock_screen(self):
+    def lock_screen(self, lock):
         hm = pyWinhook.HookManager()
-        hm.MouseAll = self.uMad
-        hm.KeyAll = self.uMad
-        hm.HookMouse()
-        hm.HookKeyboard()
-        pythoncom.PumpMessages()
-
-    def unlock_screen(self):
-        pass
+        if lock is True:
+            hm.MouseAll = self.uMad
+            hm.KeyAll = self.uMad
+            hm.HookMouse()
+            hm.HookKeyboard()
+            pythoncom.PumpMessages()
+        else:
+            hm.UnhookMouse()
+            hm.UnhookKeyboard()
 
     def command_response(self, command):
         if command == "send_screen":
+            mouse_thread = threading.Thread(target=show_mouse(), args=())
+            mouse_thread.start()
             self.recieve_screen()
         if command == "lock_screen":
-            self.lock_screen()
+            self.lock_screen(True)
         if command == "unlock_screen":
-            self.unlock_screen()
-
+            self.lock_screen(False)
 
     def run(self):
         self.client_socket.sendto("hello from client".encode(), (self.server_ip, self.port))
         while True:
             try:
                 data, address = self.client_socket.recvfrom(self.max_bytes)
-                print(data)
                 data = data.decode()
+                # if data.startswith("command"):
                 self.command_response(data)
             except:
                 pass
