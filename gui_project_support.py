@@ -24,7 +24,6 @@ except ImportError:
     py3 = True
 
 def lock_button(p1):
-    # common.task_command = "lock_screen"
     # lock_thread = threading.Thread(target=server_big_project.command_click(), args=())
     # lock_thread.start()
     # sys.stdout.flush()
@@ -43,13 +42,11 @@ def send_file(p1):
     # sys.stdout.flush()
 
 def start_share_screen(p1):
-    
     #mss_thread = threading.Thread(target=server_big_project.mss_screen, args=())
     #mss_thread.start()
     time.sleep(0.01)
     common.conn_q.put("send_screen")
     common.picture_flag = 1
-    # server_big_project.command_click()
     # sys.stdout.flush()
 
 def stop_share_screen(p1):
@@ -59,7 +56,7 @@ def stop_share_screen(p1):
     # sys.stdout.flush()
 
 def turn_off(p1):
-    print('gui_project_support.turn_off')
+    common.conn_q.put("turn_off")
     sys.stdout.flush()
 
 def turn_on(p1):

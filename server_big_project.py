@@ -11,6 +11,7 @@ from socket import socket
 import socket
 import common
 import time
+from pynput.mouse import Button, Controller as MouseController, Listener as MouseListener
 
 
 clients = set()
@@ -18,6 +19,7 @@ MAX_BYTES = 65000
 SERVER_IP = '0.0.0.0'
 BROADCAST_IP = '10.70.235.255'
 SERVER_PORT = 9006
+SECONDARY_PORT = 9561
 
 
 class Clients:
@@ -69,68 +71,6 @@ class Clients:
         return True
 
 
-
-def mss_screen():
-    """print("77")
-    common.picture_flag = 1
-    while common.picture_flag:
-        with mss() as sct:
-            rect = {'top': 0, 'left': 0, 'width': manager.WIDTH, 'height': manager.HEIGHT}
-            img = sct.grab(rect)
-        time.sleep(0.01)"""
-    pass
-            
-def control_mss(address):
-    with mss() as sct:
-        rect = {'top': 0, 'left': 0, 'width': manager.WIDTH, 'height': manager.HEIGHT}
-        img = sct.grab(rect)
-        pixels = compress(img.rgb, 6)
-        size = len(pixels)
-        size_len = (size.bit_length() + 7) // 8
-        size_bytes = size.to_bytes(size_len, 'big')
-        manager.server_socket.sendto(size_bytes, address)
-        sleep = False
-        if size > 200000:
-            sleep = True
-        while manager.max_bytes < len(pixels):
-            part_pixels = pixels[:manager.max_bytes]
-            manager.server_socket.sendto(part_pixels, address)
-            if sleep:
-                time.sleep(0.01)
-            pixels = pixels[manager.max_bytes:]
-        manager.server_socket.sendto(pixels, address)
-        if common.picture_flag == 1:
-            common.conn_q.put("send_screen")
-        time.sleep(0.01)
-
-def send_screen():
-        print("778")
-        # self.server_socket.sendto(screen_size.encode(), address)
-        start_ss = True
-        while True:
-            if common.conn_q.empty() == False:
-                data = common.conn_q.get()
-                if data == "send_screen":
-                    manager.server_socket.sendto("send_screen".encode(), manager.address)
-                    if start_ss == True:
-                        print("one")
-                        start_ss = False
-                        screen_size = "{},{}".format(manager.WIDTH, manager.HEIGHT)
-                        manager.server_socket.sendto(screen_size.encode(), manager.address)
-                    print("rrrr")
-                    control_mss(manager.address)
-                elif data == "send_stop":
-                    print(";;")
-                    manager.server_socket.sendto("send_stop".encode(), manager.address)
-                elif data == "lock":
-                    print("hdjkgd")
-                    manager.server_socket.sendto("lock_screen".encode(), manager.address)
-                elif data == "unlock":
-                    print("un")
-                    manager.server_socket.sendto("unlock_screen".encode(), manager.address)
-            time.sleep(0.01)
-
-
 """def broadcast(msg):
     Broadcasts a message to all the clients.
     for sock in clients:
@@ -163,6 +103,98 @@ def handle_client(client_socket):  # Takes client socket as argument.
 """
 
 
+def mss_screen():
+    """print("77")
+    common.picture_flag = 1
+    while common.picture_flag:
+        with mss() as sct:
+            rect = {'top': 0, 'left': 0, 'width': manager.WIDTH, 'height': manager.HEIGHT}
+            img = sct.grab(rect)
+        time.sleep(0.01)"""
+    pass
+            
+
+def control_mss(address):
+    with mss() as sct:
+        rect = {'top': 0, 'left': 0, 'width': manager.WIDTH, 'height': manager.HEIGHT}
+        img = sct.grab(rect)
+        pixels = compress(img.rgb, 6)
+        size = len(pixels)
+        size_len = (size.bit_length() + 7) // 8
+        size_bytes = size.to_bytes(size_len, 'big')
+        manager.server_socket.sendto(size_bytes, address)
+        sleep = False
+        if size > 200000:
+            sleep = True
+        while manager.max_bytes < len(pixels):
+            part_pixels = pixels[:manager.max_bytes]
+            manager.server_socket.sendto(part_pixels, address)
+            if sleep:
+                time.sleep(0.01)
+            pixels = pixels[manager.max_bytes:]
+        manager.server_socket.sendto(pixels, address)
+        if common.picture_flag == 1:
+            common.conn_q.put("send_screen")
+        time.sleep(0.01)
+
+
+def mouse_listener():
+    def on_move(x, y):
+        if common.picture_flag == 0:
+            mouse_listener.stop()
+            mouse_server_socket.sendto("stop_mouse".encode(), addr)
+            mouse_server_socket.close()
+        else:
+            data = "{},{}".format(x, y)
+            mouse_server_socket.sendto(data.encode(), addr)
+
+    # create socket
+    global mouse_server_socket
+    mouse_server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    mouse_server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    mouse_server_socket.bind((SERVER_IP, SECONDARY_PORT))
+    print('Listening at {}'.format(mouse_server_socket.getsockname()))
+    global addr
+    dconnect, addr = mouse_server_socket.recvfrom(MAX_BYTES)
+    # create listeners
+    with MouseListener(on_move=on_move) as mouse_listener:
+        # start listeners
+        mouse_listener.join()
+
+
+def send_screen():
+        print("778")
+        # self.server_socket.sendto(screen_size.encode(), address)
+        start_ss = True
+        while True:
+            if common.conn_q.empty() == False:
+                data = common.conn_q.get()
+                if data == "send_screen":
+                    if start_ss is True:
+                        start_ss = False
+                        manager.server_socket.sendto("send_screen".encode(), manager.address)
+                        time.sleep(0.3)
+                        screen_size = "{},{}".format(manager.WIDTH, manager.HEIGHT)
+                        manager.server_socket.sendto(screen_size.encode(), manager.address)
+                        mouse_listener_thread = threading.Thread(target=mouse_listener, args=())
+                        mouse_listener_thread.start()
+                    print("rrrr")
+                    control_mss(manager.address)
+                elif data == "send_stop":
+                    print(";;")
+                    start_ss = True
+                    manager.server_socket.sendto("send_stop".encode(), manager.address)
+                elif data == "lock":
+                    print("hdjkgd")
+                    manager.server_socket.sendto("lock_screen".encode(), manager.address)
+                elif data == "unlock":
+                    print("un")
+                    manager.server_socket.sendto("unlock_screen".encode(), manager.address)
+                elif data == "turn_off":
+                    manager.server_socket.sendto("turn_off_computer".encode(), manager.address)
+            time.sleep(0.01)
+
+
 class Server(Thread):
     def __init__(self, max_bytes):
         Thread.__init__(self)
@@ -172,7 +204,7 @@ class Server(Thread):
         self.HEIGHT = user32.GetSystemMetrics(1)
         self.max_bytes = max_bytes
         self.server_ip = SERVER_IP
-        self.broadcast_ip = BROADCAST_IP
+        self.broadcast_ip = (BROADCAST_IP, 9006)
         self.port = SERVER_PORT
         self.address = ""
         # create socket
@@ -186,6 +218,7 @@ class Server(Thread):
     def run(self):
         while True:
             data, self.address = self.server_socket.recvfrom(self.max_bytes)
+            print(data)
             data = data.decode()
             if data == "hello from client":
                 print("1")
@@ -195,19 +228,8 @@ class Server(Thread):
                 s.sendto('{0} send {1}'.format(address, data) , i )"""
             time.sleep(0.01)
 
-    
-
 
 def main():
-    """"global students
-
-    students = Clients()
-    if students.insert_client("yuvalcohen", "yuval123") is False:
-        students.insert_client("yosicohen", "yosi1234")
-
-    global a
-    a = Server(8822)
-    a.go()"""
     global manager
     manager = Server(MAX_BYTES)
     manager.start()
