@@ -15,6 +15,7 @@ from pynput.mouse import Button, Controller as MouseController, Listener as Mous
 
 
 clients = set()
+selected_clients_list = []
 MAX_BYTES = 65000
 SERVER_IP = '0.0.0.0'
 BROADCAST_IP = '10.70.235.255'
@@ -103,6 +104,14 @@ def handle_client(client_socket):  # Takes client socket as argument.
 """
 
 
+def send_broadcast(sock, data):
+    for a in clients:
+        sock.sendto(data, a)
+
+def send_selected_clients(sock, cl, data):
+    for a in cl:
+        sock.sendto(data, a)
+
 def mss_screen():
     """print("77")
     common.picture_flag = 1
@@ -162,35 +171,41 @@ def mouse_listener():
         mouse_listener.join()
 
 
-def send_screen():
-        print("778")
-        # self.server_socket.sendto(screen_size.encode(), address)
+def send_commands():
+        print("send commands started")
         start_ss = True
         while True:
-            if common.conn_q.empty() == False:
+            if common.conn_q.empty() is False:
                 data = common.conn_q.get()
+                selected_clients_list = common.selected_clients
                 if data == "send_screen":
                     if start_ss is True:
                         start_ss = False
-                        manager.server_socket.sendto("send_screen".encode(), manager.address)
+                        # manager.server_socket.sendto("send_screen".encode(), manager.address)
+                        da = "send_screen".encode()
+                        send_selected_clients(manager.server_socket, selected_clients_list, da)
                         time.sleep(0.3)
                         screen_size = "{},{}".format(manager.WIDTH, manager.HEIGHT)
-                        manager.server_socket.sendto(screen_size.encode(), manager.address)
+                        # manager.server_socket.sendto(screen_size.encode(), manager.address)
+                        send_selected_clients(manager.server_socket, selected_clients_list, screen_size.encode())
                         mouse_listener_thread = threading.Thread(target=mouse_listener, args=())
                         mouse_listener_thread.start()
-                    print("rrrr")
+                    print("send_screen")
                     control_mss(manager.address)
                 elif data == "send_stop":
-                    print(";;")
+                    print("stop send screen")
                     start_ss = True
                     manager.server_socket.sendto("send_stop".encode(), manager.address)
                 elif data == "lock":
-                    print("hdjkgd")
-                    manager.server_socket.sendto("lock_screen".encode(), manager.address)
+                    print("lock screen")
+                    da = "lock_screen".encode()
+                    send_broadcast(manager.server_socket, da)
+                    # manager.server_socket.sendto("lock_screen".encode(), manager.address)
                 elif data == "unlock":
-                    print("un")
+                    print("unlock screen")
                     manager.server_socket.sendto("unlock_screen".encode(), manager.address)
                 elif data == "turn_off":
+                    print("turn off")
                     manager.server_socket.sendto("turn_off_computer".encode(), manager.address)
             time.sleep(0.01)
 
@@ -212,17 +227,19 @@ class Server(Thread):
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.server_socket.bind((self.server_ip, self.port))
         print('Listening at {}'.format(self.server_socket.getsockname()))
-        commThread = Thread(target=send_screen, args=())
+        commThread = Thread(target=send_commands, args=())
         commThread.start()
 
     def run(self):
         while True:
             data, self.address = self.server_socket.recvfrom(self.max_bytes)
             print(data)
+            print(self.address)
             data = data.decode()
             if data == "hello from client":
-                print("1")
                 clients.add(self.address)
+                print("client was added")
+                common.gui_q.put(self.address)
             else:
                 """for i in clients:
                 s.sendto('{0} send {1}'.format(address, data) , i )"""

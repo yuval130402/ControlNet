@@ -1,4 +1,5 @@
 __author__ = 'Yuval Cohen'
+
 import sys
 import threading
 from threading import Thread
@@ -12,13 +13,15 @@ import socket
 import pygame
 import time
 from pynput.mouse import Button, Controller as MouseController, Listener as MouseListener
+import os
 
 from queue import Queue
 
 conn_q = Queue()
+check_q = Queue()
 MAX_BYTES = 65000
 # SERVER_IP = '10.70.232.229'
-SERVER_IP = '192.168.0.109'
+SERVER_IP = '192.168.0.104'
 SERVER_PORT = 9006
 SECONDARY_PORT = 9561
 
@@ -32,25 +35,30 @@ def control_mouse(data):
 
 def change_xy(x, y):
     # adjust x and y size to the other computer size
-    x = int(x * prop_x)
-    y = int(y * prop_y)
+    x = int(float(x) * prop_x)
+    y = int(float(y) * prop_y)
     return x, y
 
 
 def show_mouse():
     while client.width == -1:  # wait for recieve_screen and then start the listeners
-        pass
+        time.sleep(0.1)
     global prop_x, prop_y
     prop_x = client.width / client.WIDTH
     prop_y = client.height / client.HEIGHT
     mouse_client_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
     mouse_client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-
+    mouse_client_socket.sendto("connected".encode(), (SERVER_IP, SECONDARY_PORT))
     while True:
         data, address = mouse_client_socket.recvfrom(MAX_BYTES)
         data = data.decode()
+        if data == "stop_mouse":
+            print("kjkj")
+            check_q.put("gg")
+            break
         data = data.split(",")
         control_mouse(data)
+    mouse_client_socket.close()
 
 
 def client_send():
@@ -110,12 +118,28 @@ class Client(Thread):
         clock = pygame.time.Clock()
         watching = True
         # print other computer screen
+        def stop_screen():
+            while True:
+                if check_q.empty() is False:
+                    cc = check_q.get()
+                    print(cc)
+                    pygame.quit()
+                    break
+                time.sleep(0.1)
+        check_thread = threading.Thread(target=stop_screen, args=())
+        check_thread.start()
         try:
             while watching:
                 for event in pygame.event.get():
                     if event.type == pygame.KEYDOWN:
                         watching = False
                         break
+                if check_q.empty() is False:
+                    cc = check_q.get()
+                    print(cc)
+                    pygame.quit()
+                    watching = False
+                    break
                 size = int.from_bytes(self.socket_recv(self.client_socket, self.max_bytes), byteorder='big')
                 while size > 10000000:  # checks if it size and not part of the pixels
                     size = int.from_bytes(self.socket_recv(self.client_socket, self.max_bytes), byteorder='big')
@@ -145,20 +169,23 @@ class Client(Thread):
             hm.KeyAll = self.uMad
             hm.HookMouse()
             hm.HookKeyboard()
-            pythoncom.PumpMessages()
+            #pythoncom.PumpMessages()
         else:
             hm.UnhookMouse()
             hm.UnhookKeyboard()
 
     def command_response(self, command):
         if command == "send_screen":
-            mouse_thread = threading.Thread(target=show_mouse(), args=())
+            mouse_thread = threading.Thread(target=show_mouse, args=())
             mouse_thread.start()
             self.recieve_screen()
         if command == "lock_screen":
             self.lock_screen(True)
         if command == "unlock_screen":
+            print("v")
             self.lock_screen(False)
+        if command == "turn_off_computer":
+            os.system('shutdown /p /f')
 
     def run(self):
         self.client_socket.sendto("hello from client".encode(), (self.server_ip, self.port))
