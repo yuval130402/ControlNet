@@ -22,8 +22,8 @@ check_q = Queue()
 MAX_BYTES = 65000
 # SERVER_IP = '10.70.232.229'
 SERVER_IP = '192.168.0.104'
-SERVER_PORT = 9006
-SECONDARY_PORT = 9561
+SERVER_PORT = 9007
+SECONDARY_PORT = 9562
 
 
 def control_mouse(data):
@@ -53,8 +53,8 @@ def show_mouse():
         data, address = mouse_client_socket.recvfrom(MAX_BYTES)
         data = data.decode()
         if data == "stop_mouse":
-            print("kjkj")
-            check_q.put("gg")
+            print("stop_send_screen")
+            check_q.put("stop_send")
             break
         data = data.split(",")
         control_mouse(data)
@@ -118,29 +118,22 @@ class Client(Thread):
         clock = pygame.time.Clock()
         watching = True
         # print other computer screen
-        def stop_screen():
-            while True:
-                if check_q.empty() is False:
-                    cc = check_q.get()
-                    print(cc)
-                    pygame.quit()
-                    break
-                time.sleep(0.1)
-        check_thread = threading.Thread(target=stop_screen, args=())
-        check_thread.start()
         try:
             while watching:
                 for event in pygame.event.get():
                     if event.type == pygame.KEYDOWN:
+                        print("close")
                         watching = False
+                        pygame.quit()
                         break
                 if check_q.empty() is False:
                     cc = check_q.get()
                     print(cc)
-                    pygame.quit()
                     watching = False
+                    pygame.quit()
                     break
                 size = int.from_bytes(self.socket_recv(self.client_socket, self.max_bytes), byteorder='big')
+                print("1")
                 while size > 10000000:  # checks if it size and not part of the pixels
                     size = int.from_bytes(self.socket_recv(self.client_socket, self.max_bytes), byteorder='big')
                 temp_pixels = self.recvall(size)
@@ -180,11 +173,14 @@ class Client(Thread):
             mouse_thread.start()
             self.recieve_screen()
         if command == "lock_screen":
+            print("lock")
             self.lock_screen(True)
         if command == "unlock_screen":
-            print("v")
+            print("unlock")
             self.lock_screen(False)
         if command == "turn_off_computer":
+            print("turn off computer")
+            time.sleep(2)
             os.system('shutdown /p /f')
 
     def run(self):
