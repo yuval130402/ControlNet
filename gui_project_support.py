@@ -25,32 +25,32 @@ except ImportError:
     py3 = True
 
 def lock_button(p1):
-    # lock_thread = threading.Thread(target=server_big_project.command_click(), args=())
-    # lock_thread.start()
-    common.conn_q.put("lock")
+    common.selected_clients = selection_list()
+    if len(common.selected_clients) != 0:
+        common.conn_q.put("lock")
     # sys.stdout.flush()
 
 def unlock_button(p1):
-    common.conn_q.put("unlock")
-    # sys.stdout.flush()
-
-def send_file(p1):
-    print('gui_project_support.send_file')
+    common.selected_clients = selection_list()
+    if len(common.selected_clients) != 0:
+        common.conn_q.put("unlock")
     # sys.stdout.flush()
 
 def start_share_screen(p1):
-    #mss_thread = threading.Thread(target=server_big_project.mss_screen, args=())
-    #mss_thread.start()
     common.selected_clients = selection_list()
-    common.conn_q.put("send_screen")
-    common.picture_flag = 1
-
+    if len(common.selected_clients) != 0:
+        common.conn_q.put("send_screen")
+        common.picture_flag = 1
     # sys.stdout.flush()
 
 def stop_share_screen(p1):
     common.picture_flag = 0
-    time.sleep(0.01)
+    time.sleep(0.5)
     common.conn_q.put("send_stop")
+    # sys.stdout.flush()
+
+def send_file(p1):
+    print('gui_project_support.send_file')
     # sys.stdout.flush()
 
 def turn_off(p1):
@@ -106,7 +106,6 @@ def select_all_clients(p1):
     global w, top_level
     cl = w.Clients_List
     cl.select_set(0, 'end')  # select all
-    common.send_all = True
     print("select all")
     # sys.stdout.flush()
 
