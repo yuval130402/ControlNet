@@ -14,14 +14,23 @@ import pygame
 import time
 from pynput.mouse import Button, Controller as MouseController, Listener as MouseListener
 import os
+import tkinter as tk
+import subprocess
 
 from queue import Queue
+from ctypes import windll
+SetWindowPos = windll.user32.SetWindowPos
+
+NOSIZE = 1
+NOMOVE = 2
+TOPMOST = -1
+NOT_TOPMOST = -2
 
 conn_q = Queue()
 check_q = Queue()
 MAX_BYTES = 65000
 # SERVER_IP = '10.70.232.229'
-SERVER_IP = '192.168.0.104'
+SERVER_IP = '192.168.0.115'
 SERVER_PORT = 9007
 SECONDARY_PORT = 9562
 
@@ -48,17 +57,51 @@ def show_mouse():
     prop_y = client.height / client.HEIGHT
     mouse_client_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
     mouse_client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    time.sleep(0.3)
     mouse_client_socket.sendto("connected".encode(), (SERVER_IP, SECONDARY_PORT))
+    print("yes")
     while True:
         data, address = mouse_client_socket.recvfrom(MAX_BYTES)
         data = data.decode()
         if data == "stop_mouse":
             print("stop_send_screen")
-            check_q.put("stop_send")
+            # check_q.put("stop_send")
             break
         data = data.split(",")
         control_mouse(data)
     mouse_client_socket.close()
+
+
+def exb():
+    pass
+
+
+def waitingwindow():
+    global stop_lock
+    #  global wa
+    wa = tk.Tk()
+    # this removes the maximize button
+    wa.attributes("-topmost", True)
+    wa.state('zoomed')
+    wa.attributes("-topmost", True)
+    wa.overrideredirect(1)
+    wa.title('FUCK_YOU')
+    wa.protocol("WM_DELETE_WINDOW", exb)
+    wa.protocol("WM_MINIMIZE_WINDOW", exb)
+    x = wa.winfo_screenwidth()
+    y = wa.winfo_screenheight()
+    wa.geometry("%dx%d" % (x, y))
+    lb1 = tk.Label(wa, text="FUCK YOU BITCH\n", font=("Arial Bold", 70), pady=200, fg="RED")
+    #  p1 = tk.Label(wa, text="YOUR COLOR: BLUE \n", font=("Arial Bold", 30), pady=40, fg="blue")
+    #  p2 = tk.Label(wa, text="RIVAL COLOR: RED ", font=("Arial Bold", 30), pady=40, fg="Red")
+    lb1.pack()
+    #  p1.pack()
+    #  p2.pack()
+    wa.lift()
+    # wa.mainloop()
+    if stop_lock:
+        wa.destroy()
+    wa.update()
 
 
 def client_send():
@@ -107,6 +150,10 @@ class Client(Thread):
         return buf
 
     def recieve_screen(self):
+        def alwaysOnTop(yesOrNo):
+            zorder = (NOT_TOPMOST, TOPMOST)[yesOrNo]  # choose a flag according to bool
+            hwnd = pygame.display.get_wm_info()['window']  # handle to the window
+            SetWindowPos(hwnd, zorder, 0, 0, 0, 0, NOMOVE | NOSIZE)
         data = self.socket_recv(self.client_socket, 1024).decode()
         print(data)
         self.width, self.height = data.split(",")
@@ -116,8 +163,16 @@ class Client(Thread):
         pygame.init()
         screen = pygame.display.set_mode((self.WIDTH, self.HEIGHT), pygame.FULLSCREEN)
         clock = pygame.time.Clock()
+        self.client_socket.settimeout(3)
+        alwaysOnTop(True)
         watching = True
         # print other computer screen
+        """if check_q.empty() is False:
+                cc = check_q.get()
+                print(cc)
+                watching = False
+                pygame.quit()
+                break"""
         try:
             while watching:
                 for event in pygame.event.get():
@@ -126,12 +181,6 @@ class Client(Thread):
                         watching = False
                         pygame.quit()
                         break
-                if check_q.empty() is False:
-                    cc = check_q.get()
-                    print(cc)
-                    watching = False
-                    pygame.quit()
-                    break
                 size = int.from_bytes(self.socket_recv(self.client_socket, self.max_bytes), byteorder='big')
                 print("1")
                 while size > 10000000:  # checks if it size and not part of the pixels
@@ -149,7 +198,8 @@ class Client(Thread):
                 except:
                     pass
         finally:
-            """self.client_socket.close()"""
+            print("11111")
+            pygame.quit()
             pass
 
     def uMad(self, event):
@@ -174,13 +224,22 @@ class Client(Thread):
             self.recieve_screen()
         if command == "lock_screen":
             print("lock")
-            self.lock_screen(True)
+            global stop_lock
+            stop_lock = False
+            lock_thread = threading.Thread(target=waitingwindow(), args=())
+            lock_thread.start()
+            subprocess.call([r'C:\Users\Yuval\Desktop\big_project\block.bat 1'])
+            # os.system(r"C:\Users\Yuval\Desktop\big_project\block.bat 1")
+            # self.lock_screen(True)
         if command == "unlock_screen":
             print("unlock")
-            self.lock_screen(False)
+            stop_lock = True
+            subprocess.call([r'C:\Users\Yuval\Desktop\big_project\block.bat 0'])
+            # os.system(r"C:\Users\Yuval\Desktop\big_project\block.bat 0")
+            # self.lock_screen(False)
         if command == "turn_off_computer":
             print("turn off computer")
-            time.sleep(2)
+            time.sleep(1)
             os.system('shutdown /p /f')
 
     def run(self):
