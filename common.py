@@ -4,4 +4,5 @@ gui_q = Queue()
 picture_flag = 0
 # send_all = False
 selected_clients = []
-send_ss = False
+sharing_screen = False
+# send_ss = False

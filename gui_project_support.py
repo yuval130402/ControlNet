@@ -39,14 +39,17 @@ def unlock_button(p1):
 def start_share_screen(p1):
     common.selected_clients = selection_list()
     if len(common.selected_clients) != 0:
-        common.conn_q.put("send_screen")
+        common.sharing_screen = True
         common.picture_flag = 1
+        common.conn_q.put("send_screen")
     # sys.stdout.flush()
 
 def stop_share_screen(p1):
-    common.picture_flag = 0
-    time.sleep(0.5)
-    common.conn_q.put("send_stop")
+    if common.sharing_screen is True:
+        common.sharing_screen = False
+        common.picture_flag = 0
+        time.sleep(0.5)
+        common.conn_q.put("send_stop")
     # sys.stdout.flush()
 
 def send_file(p1):
@@ -55,15 +58,17 @@ def send_file(p1):
 
 def turn_off(p1):
     common.conn_q.put("turn_off")
-    sys.stdout.flush()
+    # sys.stdout.flush()
 
 def turn_on(p1):
     print('gui_project_support.turn_on')
     sys.stdout.flush()
 
 def watch_client(p1):
-    print('gui_project_support.watch_client')
-    sys.stdout.flush()
+    common.selected_clients = selection_list()
+    if len(common.selected_clients) != 0:
+        common.conn_q.put("watch_screen")
+    # sys.stdout.flush()
 
 def init(top, gui, *args, **kwargs):
     global w, top_level, root
@@ -98,6 +103,7 @@ def selection_list():
     if selected:  # only do stuff if user made a selection
         print(selected)
         for index in selected:
+            # selected_list.append(cl.get(index).split("  ")[1])
             selected_list.append(cl.get(index))  # how you get the value of the selection from a listbox
     print(selected_list)
     return selected_list

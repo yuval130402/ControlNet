@@ -12,6 +12,7 @@ import socket
 import common
 import time
 from pynput.mouse import Button, Controller as MouseController, Listener as MouseListener
+import pygame
 
 
 clients = set()
@@ -21,6 +22,7 @@ SERVER_IP = '0.0.0.0'
 BROADCAST_IP = '10.70.235.255'
 SERVER_PORT = 9007
 SECONDARY_PORT = 9562
+THIRD_PORT = 15678
 
 
 class Clients:
@@ -58,10 +60,11 @@ class Clients:
         conn.close()
         print("Record created successfully")
 
-    def select_client_by_id(self, client_id):
+    def select_client_by_name(self, name):
         conn = sqlite3.connect('Clients.db')
         strsql = "SELECT * from " + self.__tablename + " where " \
-                 + self.__clientId + "=" + "'" + str(client_id) + "'"
+                 + self.__name + "=" + "'" + str(name) + "'"
+        print(strsql)
         cursor = conn.execute(strsql)
         rows = cursor.fetchall()
         # type(cursor) is  'sqlite3.Cursor' ,type(rows) is 'list'
@@ -71,15 +74,21 @@ class Clients:
         conn.close()
         return True
 
+    def select_client_by_ip(self, ip_address):
+        conn = sqlite3.connect('Clients.db')
+        strsql = "SELECT * from " + self.__tablename + " where " \
+                 + self.__ip + "=" + "'" + str(ip_address) + "'"
+        print(strsql)
+        cursor = conn.execute(strsql)
+        rows = cursor.fetchall()
+        # type(cursor) is  'sqlite3.Cursor' ,type(rows) is 'list'
+        if len(rows) == 0:
+            conn.close()
+            return False
+        conn.close()
+        return True
 
-"""def broadcast(msg):
-    Broadcasts a message to all the clients.
-    for sock in clients:
-        # sock.send(bytes(prefix, "utf8") + msg)
-        sock.send(msg.encode('ascii'))
-
-
-def handle_client(client_socket):  # Takes client socket as argument.
+"""def handle_client(client_socket):  # Takes client socket as argument.
     Handles a single client connection.
     while(1):
         client_info = client_socket.recv(1024).decode('ascii')
@@ -144,6 +153,7 @@ def control_mss(selected_clients_list):
         except:
             if common.picture_flag == 1:
                 common.conn_q.put("send_screen")
+            time.sleep(0.01)
 
 
 def mouse_listener():
@@ -152,7 +162,7 @@ def mouse_listener():
             mouse_listener.stop()
             send_selected_clients(mouse_server_socket, selected_clients_mouse, "stop_mouse".encode())
             # mouse_server_socket.sendto("stop_mouse".encode(), addr)
-            mouse_server_socket.close()
+            # mouse_server_socket.close()
         else:
             data = "{},{}".format(x, y).encode()
             send_selected_clients(mouse_server_socket, selected_clients_mouse, data)
@@ -161,15 +171,21 @@ def mouse_listener():
     def mouse_recv():
         global addr
         while common.picture_flag == 1:
-            dconnect, addr = mouse_server_socket.recvfrom(MAX_BYTES)
-            selected_clients_mouse.append(addr)
+            try:
+                dconnect, addr = mouse_server_socket.recvfrom(MAX_BYTES)
+                selected_clients_mouse.append(addr)
+            except Exception as e:
+                print(e)
     # create socket
+    global start_mouse_socket
     global mouse_server_socket
     global selected_clients_mouse
     selected_clients_mouse = []
-    mouse_server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    mouse_server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    mouse_server_socket.bind((SERVER_IP, SECONDARY_PORT))
+    if start_mouse_socket == 0:
+        start_mouse_socket = 1
+        mouse_server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        mouse_server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        mouse_server_socket.bind((SERVER_IP, SECONDARY_PORT))
     print('Listening at {}'.format(mouse_server_socket.getsockname()))
     mouse_recv_thread = Thread(target=mouse_recv, args=())
     mouse_recv_thread.start()
@@ -179,10 +195,83 @@ def mouse_listener():
         mouse_listener.join()
 
 
+def socket_recv(conn_socket, msgsize):
+    full_message, address = conn_socket.recvfrom(msgsize)
+    return full_message
+
+
+def recvall(length):
+    buf = b''
+    while len(buf) < length:
+        data = watch_server_socket.recvfrom(MAX_BYTES)
+        data = data[0]
+        if not data:
+            return data
+        buf += data
+    return buf
+
+
+def recieve_screen(clients_list):
+    global watch_server_socket
+    global start_watch_socket
+    start_watch_socket = 1
+    watch_server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    watch_server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+    watch_server_socket.bind((SERVER_IP, THIRD_PORT))
+    data, watch_address = watch_server_socket.recvfrom(1024)
+    print(data)
+    print(watch_address)
+    data = data.decode()
+    width, height = data.split(",")
+    width = int(width)
+    height = int(height)
+    # open the window
+    pygame.init()
+    screen = pygame.display.set_mode((manager.WIDTH, manager.HEIGHT))
+    clock = pygame.time.Clock()
+    watch_server_socket.settimeout(4)
+    watching = True
+    # print other computer screen
+    try:
+        while watching:
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    print("close")
+                    watching = False
+                    pygame.quit()
+                    send_selected_clients(manager.server_socket, clients_list, "watch_stop".encode())
+                    # watch_server_socket.sendto("watch_stop".encode(), watch_address)
+                    break
+            size = int.from_bytes(socket_recv(watch_server_socket, MAX_BYTES), byteorder='big')
+            print("1")
+            while size > 10000000:  # checks if it size and not part of the pixels
+                size = int.from_bytes(socket_recv(watch_server_socket, MAX_BYTES), byteorder='big')
+            temp_pixels = recvall(size)
+            try:
+                pixels = decompress(temp_pixels)
+                # Create the Surface from raw pixels
+                img = pygame.image.fromstring(pixels, (width, height), 'RGB')
+                picture = pygame.transform.scale(img, (manager.WIDTH, manager.HEIGHT))
+                # Display the picture
+                screen.blit(picture, (0, 0))
+                pygame.display.flip()
+                clock.tick(60)
+            except:
+                pass
+    finally:
+        print("11111")
+        pygame.quit()
+        pass
+
+
 def send_commands():
     print("send commands started")
-    global start_ss
+    global start_ss  # acts I should command before start send screen
     start_ss = True
+    global start_mouse_socket
+    start_mouse_socket = 0
+    global start_watch_socket
+    start_watch_socket = 0
     selected_clients_list = []
     while True:
         if common.conn_q.empty() is False:
@@ -192,14 +281,14 @@ def send_commands():
                     start_ss = False
                     selected_clients_list = common.selected_clients
                     # manager.server_socket.sendto("send_screen".encode(), manager.address)
+                    mouse_listener_thread = threading.Thread(target=mouse_listener, args=())
+                    mouse_listener_thread.start()
                     da = "send_screen".encode()
                     send_selected_clients(manager.server_socket, selected_clients_list, da)
                     time.sleep(0.3)
                     screen_size = "{},{}".format(manager.WIDTH, manager.HEIGHT)
                     # manager.server_socket.sendto(screen_size.encode(), manager.address)
                     send_selected_clients(manager.server_socket, selected_clients_list, screen_size.encode())
-                    mouse_listener_thread = threading.Thread(target=mouse_listener, args=())
-                    mouse_listener_thread.start()
                 print("send_screen")
                 control_mss(selected_clients_list)
             elif data == "send_stop":
@@ -222,6 +311,11 @@ def send_commands():
                 selected_clients_list = common.selected_clients
                 da = "turn_off_computer".encode()
                 send_selected_clients(manager.server_socket, selected_clients_list, da)
+            elif data == "watch_screen":
+                selected_clients_list = common.selected_clients
+                send_selected_clients(manager.server_socket, selected_clients_list, "watch_screen".encode())
+                recieve_screen(selected_clients_list)
+
         time.sleep(0.01)
 
 
@@ -246,11 +340,22 @@ class Server(Thread):
         commThread.start()
 
     def run(self):
+        global clients
         while True:
             data, self.address = self.server_socket.recvfrom(self.max_bytes)
             print(data)
             print(self.address)
-            data = data.decode()
+            data = str(data.decode())
+            """if data.startswith("new client"):
+                if clients_table.select_client_by_ip(str(self.address[0])) is False:
+                    if clients_table.select_client_by_name(data[10:]) is False:
+                        clients.add(self.address)
+                        clients_table.insert_client(data, str(self.address[0]))
+                        print("client was added")
+                        common.gui_q.put(data[10:] + "  " + str(self.address[0]))
+                        self.server_socket.sendto("welcome".encode(), self.address)
+                    else:
+                        self.server_socket.sendto("enter other name".encode(), self.address)"""
             if data == "hello from client":
                 clients.add(self.address)
                 print("client was added")
@@ -263,6 +368,8 @@ class Server(Thread):
 
 def main():
     global manager
+    global clients_table
+    clients_table = Clients()
     manager = Server(MAX_BYTES)
     manager.start()
 
