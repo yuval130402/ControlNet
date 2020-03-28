@@ -21,11 +21,11 @@ def createShelfFolder():
 
     shelf = shelve.open("../vars/")  # directory for text file to save the vars
     shelf['activation'] = False
-    shelf['active_flag'] = 0
+    # shelf['active_flag'] = 0
 
 
-
-try:
-    createShelfFolder()
-except:
-    pass
+def create_start():
+    try:
+        createShelfFolder()
+    except:
+        pass

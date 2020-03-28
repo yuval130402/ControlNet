@@ -1,5 +1,6 @@
 __author__ = 'Yuval Cohen'
-
+"""The main file on the client computer. Includes the Client class, 
+his commands and his communication with the server."""
 import sys
 import threading
 from threading import Thread
@@ -17,6 +18,7 @@ import os
 import tkinter as tk
 import subprocess
 import shelve
+import createvars
 
 from queue import Queue
 from ctypes import windll
@@ -28,6 +30,7 @@ NOMOVE = 2
 TOPMOST = -1
 NOT_TOPMOST = -2
 
+BATCH_LOCK = r"C:\Users\Yuval\Desktop\big_project\block.bat"
 conn_q = Queue()
 check_q = Queue()
 MAX_BYTES = 65000
@@ -40,7 +43,6 @@ THIRD_PORT = 15678
 
 def recv_watch():
     global watch_screen
-    print("d")
     data, address = watch_client_socket.recvfrom(1024)
     if data.decode() == "watch_stop":
         print("kkk")
@@ -48,6 +50,7 @@ def recv_watch():
 
 
 def control_mss():
+    # the function photographs the student's screen and sends it to the teacher
     global watch_screen
     watch_screen = True
     global watch_client_socket
@@ -85,6 +88,7 @@ def control_mss():
 
 
 def control_mouse(data):
+    # gets the position of the teacher's mouse and change the mouse to this position
     if len(data) == 2:
         x1, y1 = data
         x, y = change_xy(x1, y1)
@@ -99,6 +103,8 @@ def change_xy(x, y):
 
 
 def show_mouse():
+    # create a connection with the server mouse socket,
+    # loop of recieves the position of the teacher's mouse and change the mouse to this position
     while client.width == -1:  # wait for recieve_screen and then start the listeners
         time.sleep(0.1)
     global prop_x, prop_y
@@ -126,6 +132,7 @@ def exb():
 
 
 def waitingwindow():
+    # create a window showing 'lock computer'
     wa = tk.Tk()
     # this removes the maximize button
     wa.state('zoomed')
@@ -148,7 +155,13 @@ def waitingwindow():
     wa.destroy()
 
 
+def run_batch(param):
+    # run the batch file with the parameter it gets
+    os.system(BATCH_LOCK + " " + param)
+
+
 def client_send():
+    # The function is responsible for sending information from the client
     while True:
         if conn_q.empty() == False:
             data = conn_q.get()
@@ -176,14 +189,17 @@ class Client(Thread):
         send_thread.start()
 
     def socket_send(self, conn_socket, message):
+        # gets the socket object and the message to send, and send it to the server.
         connection_address_port = (self.server_ip, self.port)
         conn_socket.sendto(message.encode(), connection_address_port)
 
     def socket_recv(self, conn_socket, msgsize):
+        # gets the socket object and the max size of recv, returns the recieved message.
         full_message, address = conn_socket.recvfrom(msgsize)
         return full_message
 
     def recvall(self, length):
+        # gets the size(length) of the picture, returns the pixels of the picture.
         buf = b''
         while len(buf) < length:
             data = self.client_socket.recvfrom(self.max_bytes)
@@ -194,6 +210,7 @@ class Client(Thread):
         return buf
 
     def recieve_screen(self):
+        # display on the client's screen the screen of the server.
         def alwaysOnTop(yesOrNo):
             zorder = (NOT_TOPMOST, TOPMOST)[yesOrNo]  # choose a flag according to bool
             hwnd = pygame.display.get_wm_info()['window']  # handle to the window
@@ -219,6 +236,7 @@ class Client(Thread):
                 break"""
         try:
             while watching:
+                alwaysOnTop(True)
                 for event in pygame.event.get():
                     if event.type == pygame.KEYDOWN:
                         print("close")
@@ -242,7 +260,8 @@ class Client(Thread):
                 except:
                     pass
         finally:
-            print("11111")
+            print("pygame quit")
+            shelf['activation'] = False
             pygame.quit()
             self.client_socket.settimeout(None)
             pass
@@ -263,22 +282,27 @@ class Client(Thread):
             hm.UnhookKeyboard()
 
     def command_response(self, command):
+        # gets a string of the selected command and handle it.
         if command == "send_screen":
             mouse_thread = threading.Thread(target=show_mouse, args=())
             mouse_thread.start()
+            shelf['activation'] = True
+            run1_thread = threading.Thread(target=run_batch, args="1")
+            run1_thread.start()
             self.recieve_screen()
         if command == "lock_screen":
             print("lock")
             shelf['activation'] = True
-            import tst
+            run2_thread = threading.Thread(target=run_batch, args="0")
+            run2_thread.start()
+            time.sleep(0.5)
             lock_thread = threading.Thread(target=waitingwindow, args=())
             lock_thread.start()
-            os.system(r"C:\Users\Yuval\Desktop\big_project\block.bat 1")
             # self.lock_screen(True)
         if command == "unlock_screen":
             print("unlock")
             shelf['activation'] = False
-            os.system(r"C:\Users\Yuval\Desktop\big_project\block.bat 0")
+            # os.system(BATCH_LOCK + " 0")
             # self.lock_screen(False)
         if command == "turn_off_computer":
             print("turn off computer")
@@ -292,19 +316,22 @@ class Client(Thread):
             # control_mss()
 
     def run(self):
+        # runs client listening.
         global watch_screen
-        self.client_socket.sendto("hello from client".encode(), (self.server_ip, self.port))
-        """computer_name = input("enter your computer name/number")
-        while True:
-            self.client_socket.sendto(("new client" + computer_name).encode(), (self.server_ip, self.port))
-            data, address = self.client_socket.recvfrom(self.max_bytes)
-            if data.decode() == "welcome":
-                break
-            computer_name = input(data.decode())"""
+        self.client_socket.sendto("new client".encode(), (self.server_ip, self.port))
+        data, address = self.client_socket.recvfrom(self.max_bytes)
+        if data.decode() != "connected":
+            computer_name = str(input("enter your computer name/number"))
+            while True:
+                self.client_socket.sendto(("new client" + computer_name).encode(), (self.server_ip, self.port))
+                data, address = self.client_socket.recvfrom(self.max_bytes)
+                if data.decode() == "welcome":
+                    break
+                computer_name = str(input(data.decode()))
 
         while True:
             try:
-                print("6")
+                print("run")
                 data, address = self.client_socket.recvfrom(self.max_bytes)
                 print(data)
                 data = data.decode()
@@ -318,6 +345,7 @@ class Client(Thread):
 
 def main():
     global client
+    createvars.create_start()
     client = Client(MAX_BYTES)
     client.start()
 
