@@ -1,4 +1,6 @@
 __author__ = 'Yuval Cohen'
+"""The main file on the teacher's computer. 
+Includes the server, its functions and its communication with the clients."""
 import sqlite3
 import sys
 import threading
@@ -26,7 +28,9 @@ THIRD_PORT = 15678
 
 
 class Clients:
+    # The class represents the database of the system clients that the manager controls.
     def __init__(self):
+        # The function initializes the database
         self.__tablename = "CLIENTS"
         self.__clientId = "ClientId"
         self.__name = "Name"
@@ -47,9 +51,11 @@ class Clients:
         return "table name is ", self.__tablename
 
     def get_table_name(self):
+        # return the database name.
         return self.__tablename
 
     def insert_client(self, name, ip):
+        # gets a specific client's name and ip, the function insert the client to the database.
         conn = sqlite3.connect('Clients.db')
         str_insert = "INSERT INTO " + self.__tablename + " (" \
                      + self.__name + "," + self.__ip + ") VALUES (" \
@@ -61,6 +67,7 @@ class Clients:
         print("Record created successfully")
 
     def select_client_by_name(self, name):
+        # gets a specific client's name, returns True if it exists in the database, False if not.
         conn = sqlite3.connect('Clients.db')
         strsql = "SELECT * from " + self.__tablename + " where " \
                  + self.__name + "=" + "'" + str(name) + "'"
@@ -74,7 +81,20 @@ class Clients:
         conn.close()
         return True
 
+    def return_client_by_name(self, name):
+        # gets a specific client's name, returns an array of a record with this name.
+        conn = sqlite3.connect('Clients.db')
+        strsql = "SELECT * from " + self.__tablename + " where " \
+                 + self.__name + "=" + "'" + str(name) + "'"
+        print(strsql)
+        cursor = conn.execute(strsql)
+        rows = cursor.fetchall()
+        # type(cursor) is  'sqlite3.Cursor' ,type(rows) is 'list'
+        conn.close()
+        return rows
+
     def select_client_by_ip(self, ip_address):
+        # gets a specific client's ip, returns True if it exists in the database, False if not.
         conn = sqlite3.connect('Clients.db')
         strsql = "SELECT * from " + self.__tablename + " where " \
                  + self.__ip + "=" + "'" + str(ip_address) + "'"
@@ -88,43 +108,37 @@ class Clients:
         conn.close()
         return True
 
-"""def handle_client(client_socket):  # Takes client socket as argument.
-    Handles a single client connection.
-    while(1):
-        client_info = client_socket.recv(1024).decode('ascii')
-        if client_info == "":
-            client_socket.close()
-            clients.remove(client_socket)
-            print("client close the socket")
-            sys.exit()
-            break
-        client_info = client_info.split(" ")
-        username = client_info[0]
-        password = client_info[1]
-        print(username, password)
-        s = u.select_user_by_id(username, password)
-        if s is True:
-            welcome = "Welcome " + str(username)
-            client_socket.send(welcome.encode('ascii'))
-            print_products = p.select_Products()
-            client_socket.send(print_products.encode('ascii'))
-        else:
-            client_socket.send("error".encode('ascii'))
-"""
+    def return_client_by_ip(self, ip_address):
+        # gets a specific client's ip, returns an array of a record with this ip.
+        conn = sqlite3.connect('Clients.db')
+        strsql = "SELECT * from " + self.__tablename + " where " \
+                 + self.__ip + "=" + "'" + str(ip_address) + "'"
+        print(strsql)
+        cursor = conn.execute(strsql)
+        rows = cursor.fetchall()
+        # type(cursor) is  'sqlite3.Cursor' ,type(rows) is 'list'
+        conn.close()
+        print(rows)
+        return rows
 
 
 def send_broadcast(sock, data):
+    # gets the socket object and the send data, sends the data to all the clients in the system.
     for a in clients:
         sock.sendto(data, a)
 
 
 def send_selected_clients(sock, cl, data):
+    # gets the socket object, an array of selected clients and the send data,
+    # sends the data to the selected clients.
     for a in cl:
         print(a)
         sock.sendto(data, a)
 
 
 def control_mss(selected_clients_list):
+    # The function receives a student list, it photographs the teacher's screen
+    # and sends it to the list of selected students by the teacher.
     with mss() as sct:
         try:
             rect = {'top': 0, 'left': 0, 'width': manager.WIDTH, 'height': manager.HEIGHT}
@@ -157,6 +171,8 @@ def control_mss(selected_clients_list):
 
 
 def mouse_listener():
+    # The function listens to the mouse movements of the teacher
+    # and sends the mouse position to the selected students computers
     def on_move(x, y):
         if common.picture_flag == 0:
             mouse_listener.stop()
@@ -196,11 +212,14 @@ def mouse_listener():
 
 
 def socket_recv(conn_socket, msgsize):
+    # gets the socket object and the max size of the recieve message,
+    # returns the message that gets from the client.
     full_message, address = conn_socket.recvfrom(msgsize)
     return full_message
 
 
 def recvall(length):
+    # gets the size(length) of the picture, returns the pixels of the picture.
     buf = b''
     while len(buf) < length:
         data = watch_server_socket.recvfrom(MAX_BYTES)
@@ -212,6 +231,8 @@ def recvall(length):
 
 
 def recieve_screen(clients_list):
+    # the function gets an array of selected clients,
+    # displays on the manager's screen the screen of the client that he selected.
     global watch_server_socket
     global start_watch_socket
     start_watch_socket = 1
@@ -242,12 +263,13 @@ def recieve_screen(clients_list):
                     send_selected_clients(manager.server_socket, clients_list, "watch_stop".encode())
                     # watch_server_socket.sendto("watch_stop".encode(), watch_address)
                     break
-            size = int.from_bytes(socket_recv(watch_server_socket, MAX_BYTES), byteorder='big')
-            print("1")
-            while size > 10000000:  # checks if it size and not part of the pixels
-                size = int.from_bytes(socket_recv(watch_server_socket, MAX_BYTES), byteorder='big')
-            temp_pixels = recvall(size)
             try:
+                size = int.from_bytes(socket_recv(watch_server_socket, MAX_BYTES), byteorder='big')
+                print("1")
+                while size > 10000000:  # checks if it size and not part of the pixels
+                    size = int.from_bytes(socket_recv(watch_server_socket, MAX_BYTES), byteorder='big')
+
+                temp_pixels = recvall(size)
                 pixels = decompress(temp_pixels)
                 # Create the Surface from raw pixels
                 img = pygame.image.fromstring(pixels, (width, height), 'RGB')
@@ -261,10 +283,35 @@ def recieve_screen(clients_list):
     finally:
         print("11111")
         pygame.quit()
+        watch_server_socket.close()
         pass
 
 
+def selected_client_address(client_ip):
+    # the function gets string of client's ip and return tuple of client address if it exists.
+    for x in clients:
+        if x[0] == client_ip:
+            return x
+    return "Wrong"
+
+
+def selected_clients_from_their_names(selected_names):
+    # the function gets an array of the names of selected students
+    # returns an array of the client selected addresses.
+    clients_selects = []
+    for name in selected_names:
+        client_data = clients_table.return_client_by_name(name)
+        client_ip = client_data[0][2]
+        client_address = selected_client_address(client_ip)
+        if client_address != "Wrong":
+            clients_selects.append(client_address)
+    print(clients_selects)
+    return clients_selects
+
+
 def send_commands():
+    # The function is responsible for routing to the action selected
+    # by the manager and sending it to the selected students.
     print("send commands started")
     global start_ss  # acts I should command before start send screen
     start_ss = True
@@ -279,7 +326,7 @@ def send_commands():
             if data == "send_screen":
                 if start_ss is True:
                     start_ss = False
-                    selected_clients_list = common.selected_clients
+                    selected_clients_list = selected_clients_from_their_names(common.selected_clients)
                     # manager.server_socket.sendto("send_screen".encode(), manager.address)
                     mouse_listener_thread = threading.Thread(target=mouse_listener, args=())
                     mouse_listener_thread.start()
@@ -297,22 +344,22 @@ def send_commands():
                 send_selected_clients(manager.server_socket, selected_clients_list, "send_stop".encode())
             elif data == "lock":
                 print("lock screen")
-                selected_clients_list = common.selected_clients
+                selected_clients_list = selected_clients_from_their_names(common.selected_clients)
                 da = "lock_screen".encode()
                 send_selected_clients(manager.server_socket, selected_clients_list, da)
                 # manager.server_socket.sendto("lock_screen".encode(), manager.address)
             elif data == "unlock":
                 print("unlock screen")
-                selected_clients_list = common.selected_clients
+                selected_clients_list = selected_clients_from_their_names(common.selected_clients)
                 da = "unlock_screen".encode()
                 send_selected_clients(manager.server_socket, selected_clients_list, da)
             elif data == "turn_off":
                 print("turn off")
-                selected_clients_list = common.selected_clients
+                selected_clients_list = selected_clients_from_their_names(common.selected_clients)
                 da = "turn_off_computer".encode()
                 send_selected_clients(manager.server_socket, selected_clients_list, da)
             elif data == "watch_screen":
-                selected_clients_list = common.selected_clients
+                selected_clients_list = selected_clients_from_their_names(common.selected_clients)
                 send_selected_clients(manager.server_socket, selected_clients_list, "watch_screen".encode())
                 recieve_screen(selected_clients_list)
 
@@ -339,27 +386,44 @@ class Server(Thread):
         commThread = Thread(target=send_commands, args=())
         commThread.start()
 
+    def add_client(self, new_address, new_name=""):
+        # gets new address and name, insert the client to the DB if it possible.
+        if clients_table.select_client_by_ip(str(new_address[0])) is False:
+            if new_name == "":
+                self.server_socket.sendto("enter a name".encode(), new_address)
+            else:
+                if clients_table.select_client_by_name(new_name) is False:
+                    clients.add(new_address)
+                    clients_table.insert_client(new_name, str(new_address[0]))
+                    print("client was added")
+                    # common.gui_q.put(" " + new_name + "  " + str(new_address[0]))
+                    common.gui_q.put(" " + new_name)
+                    self.server_socket.sendto("welcome".encode(), new_address)
+                else:
+                    self.server_socket.sendto("enter other name".encode(), new_address)
+        else:
+            clients.add(new_address)
+            print("client was added")
+            client_data = clients_table.return_client_by_ip(new_address[0])
+            common.gui_q.put(" " + client_data[0][1])
+            self.server_socket.sendto("connected".encode(), new_address)
+
     def run(self):
-        global clients
+        # run server listening.
         while True:
             data, self.address = self.server_socket.recvfrom(self.max_bytes)
             print(data)
             print(self.address)
             data = str(data.decode())
-            """if data.startswith("new client"):
-                if clients_table.select_client_by_ip(str(self.address[0])) is False:
-                    if clients_table.select_client_by_name(data[10:]) is False:
-                        clients.add(self.address)
-                        clients_table.insert_client(data, str(self.address[0]))
-                        print("client was added")
-                        common.gui_q.put(data[10:] + "  " + str(self.address[0]))
-                        self.server_socket.sendto("welcome".encode(), self.address)
-                    else:
-                        self.server_socket.sendto("enter other name".encode(), self.address)"""
-            if data == "hello from client":
-                clients.add(self.address)
-                print("client was added")
-                common.gui_q.put(self.address)
+            if data.startswith("new client"):
+                if len(data) == 10:
+                    self.add_client(self.address)
+                else:
+                    self.add_client(self.address, data[10:])
+            #if data == "hello from client":
+                #clients.add(self.address)
+                #print("client was added")
+                #common.gui_q.put(self.address)
             else:
                 """for i in clients:
                 s.sendto('{0} send {1}'.format(address, data) , i )"""

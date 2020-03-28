@@ -5,6 +5,9 @@
 #  in conjunction with Tcl version 8.6
 #    Jan 19, 2020 05:02:54 PM +0200  platform: Windows NT
 #    Feb 28, 2020 04:59:19 PM +0200  platform: Windows NT
+"""gui_project.py - A file responsible for the user interface
+ presented to the manager of the class, it is automatically built by page.
+ gui_project_support.py - The file contains the UI functionality"""
 
 import sys
 import common
@@ -25,18 +28,21 @@ except ImportError:
     py3 = True
 
 def lock_button(p1):
+    # The function is called when the manager presses the lock button
     common.selected_clients = selection_list()
     if len(common.selected_clients) != 0:
         common.conn_q.put("lock")
     # sys.stdout.flush()
 
 def unlock_button(p1):
+    # The function is called when the manager presses the unlock button
     common.selected_clients = selection_list()
     if len(common.selected_clients) != 0:
         common.conn_q.put("unlock")
     # sys.stdout.flush()
 
 def start_share_screen(p1):
+    # The function is called when the manager presses the start-share-screen button
     common.selected_clients = selection_list()
     if len(common.selected_clients) != 0:
         common.sharing_screen = True
@@ -45,6 +51,7 @@ def start_share_screen(p1):
     # sys.stdout.flush()
 
 def stop_share_screen(p1):
+    # The function is called when the manager presses the stop-share-screen button
     if common.sharing_screen is True:
         common.sharing_screen = False
         common.picture_flag = 0
@@ -53,18 +60,22 @@ def stop_share_screen(p1):
     # sys.stdout.flush()
 
 def send_file(p1):
+    # The function is called when the manager presses the send-file button
     print('gui_project_support.send_file')
     # sys.stdout.flush()
 
 def turn_off(p1):
+    # The function is called when the manager presses the turn-off button
     common.conn_q.put("turn_off")
     # sys.stdout.flush()
 
 def turn_on(p1):
+    # The function is called when the manager presses the turn-on button
     print('gui_project_support.turn_on')
     sys.stdout.flush()
 
 def watch_client(p1):
+    # The function is called when the manager presses the watch-client-screen button
     common.selected_clients = selection_list()
     if len(common.selected_clients) != 0:
         common.conn_q.put("watch_screen")
@@ -87,15 +98,21 @@ def destroy_window():
     top_level = None
 
 def on_after_elapsed():
+    # A function that adds a student to the list of students
+    # presented to the teacher or deletes a disconnected student
     global w, top_level
+    to = w.Clients_List
     if common.gui_q.empty() is False:
         text = common.gui_q.get()
-        to = w.Clients_List
         to.insert('end', text)
         print("size: " + str(to.size_()))
     top_level.after(1000, on_after_elapsed)
+    #label = "Shrimp Tempura"
+    #idx = to.get(0, tk.END).index(label)
+    #to.delete(idx)
 
 def selection_list():
+    # A function that returns an array of student names selected by the teacher from the listbox
     global w, top_level
     cl = w.Clients_List
     selected = cl.curselection()
@@ -103,12 +120,12 @@ def selection_list():
     if selected:  # only do stuff if user made a selection
         print(selected)
         for index in selected:
-            # selected_list.append(cl.get(index).split("  ")[1])
-            selected_list.append(cl.get(index))  # how you get the value of the selection from a listbox
+            selected_list.append(cl.get(index).strip())  # how you get the value of the selection from a listbox
     print(selected_list)
     return selected_list
 
 def select_all_clients(p1):
+    # The function marks all student computers as selected
     global w, top_level
     cl = w.Clients_List
     cl.select_set(0, 'end')  # select all
@@ -116,6 +133,7 @@ def select_all_clients(p1):
     # sys.stdout.flush()
 
 def clear_selection_listbox(p1):
+    # The function deletes the student mark
     global w, top_level
     cl = w.Clients_List
     cl.select_clear(0, 'end')  # unselect all
