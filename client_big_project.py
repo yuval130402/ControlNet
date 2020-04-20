@@ -19,26 +19,46 @@ import tkinter as tk
 import subprocess
 import shelve
 import createvars
+import getpass
+from pathlib import Path
+from getmac import get_mac_address as gma
+
 
 from queue import Queue
 from ctypes import windll
 SetWindowPos = windll.user32.SetWindowPos
+createvars.create_start()
 shelf = shelve.open("../vars/")
+USER_NAME = getpass.getuser()
 
 NOSIZE = 1
 NOMOVE = 2
 TOPMOST = -1
 NOT_TOPMOST = -2
 
-BATCH_LOCK = r"C:\Users\Yuval\Desktop\big_project\block.bat"
+prog_call = Path(__file__).absolute()
+prog_call = r'%s' % str(prog_call).replace('\\', '/')
+prog_location = os.path.split(prog_call)[0]
+BATCH_LOCK = prog_location + "/block.bat"
+BLOCK_INPUT_LOCATION = prog_location + "/block_input.py"
 conn_q = Queue()
 check_q = Queue()
 MAX_BYTES = 65000
 # SERVER_IP = '10.70.232.229'
-SERVER_IP = '192.168.0.115'
+SERVER_IP = '192.168.0.116'
+MAC_ADDRESS = gma().replace(":", "")
 SERVER_PORT = 9007
 SECONDARY_PORT = 9562
 THIRD_PORT = 15678
+
+
+def add_to_startup(file_path=""):
+    if file_path == "":
+        file_path = prog_call
+    bat_path = r'C:\Users\%s\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup' % USER_NAME
+    with open(bat_path + '\\' + "open.bat", "w+") as bat_file:
+        bat_file.write('cd %s/venv/Scripts/activate' % prog_location + '\n')
+        bat_file.write(r'start "" %s' % os.path.split(file_path)[1])
 
 
 def recv_watch():
@@ -157,7 +177,7 @@ def waitingwindow():
 
 def run_batch(param):
     # run the batch file with the parameter it gets
-    os.system(BATCH_LOCK + " " + param)
+    os.system(BATCH_LOCK + " " + BLOCK_INPUT_LOCATION + " " + param)
 
 
 def client_send():
@@ -182,6 +202,7 @@ class Client(Thread):
         self.max_bytes = max_bytes
         self.server_ip = SERVER_IP
         self.port = SERVER_PORT
+        self.mac = MAC_ADDRESS
         self.mouse = MouseController()
         self.client_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
         self.client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -323,12 +344,18 @@ class Client(Thread):
         if data.decode() != "connected":
             computer_name = str(input("enter your computer name/number"))
             while True:
-                self.client_socket.sendto(("new client" + computer_name).encode(), (self.server_ip, self.port))
+                computer_data = ("new client" + computer_name + "    " + self.mac).encode()
+                self.client_socket.sendto(computer_data, (self.server_ip, self.port))
                 data, address = self.client_socket.recvfrom(self.max_bytes)
                 if data.decode() == "welcome":
                     break
                 computer_name = str(input(data.decode()))
 
+        if shelf['command_execute'] != "":
+            if shelf['command_execute'] == "lock_screen":
+                self.command_response("lock_screen")
+            if shelf['command_execute'] == "lock_screen":
+                self.command_response("unlock_screen")
         while True:
             try:
                 print("run")
@@ -344,8 +371,8 @@ class Client(Thread):
 
 
 def main():
+    add_to_startup()
     global client
-    createvars.create_start()
     client = Client(MAX_BYTES)
     client.start()
 

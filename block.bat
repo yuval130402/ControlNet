@@ -1,1 +1,1 @@
-python C:\Users\Yuval\Desktop\big_project\block_input.py %1
+python %1 %2
