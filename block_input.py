@@ -1,14 +1,8 @@
 import subprocess
 from subprocess import check_output
-import time
-import threading
-from threading import Thread
 import sys
 import shelve
-from apscheduler.schedulers.blocking import BlockingScheduler
-
 shelf = shelve.open("../vars/")
-scheduler = BlockingScheduler()
 
 
 def parser(msg, keyWord):
@@ -76,7 +70,6 @@ def lock_all():
         print(Mouse_devices)
         print("Keyboard")
         print(keyboard_devices)
-        # if len(keyboard_devices) != 0:
         try:
             callDevcon("remove", keyboard_devices)
         except:

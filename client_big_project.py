@@ -57,8 +57,10 @@ def add_to_startup(file_path=""):
         file_path = prog_call
     bat_path = r'C:\Users\%s\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup' % USER_NAME
     with open(bat_path + '\\' + "open.bat", "w+") as bat_file:
-        bat_file.write('cd %s/venv/Scripts/activate' % prog_location + '\n')
-        bat_file.write(r'start "" %s' % os.path.split(file_path)[1])
+        bat_file.write('''@echo off
+set "params=%*"
+cd /d "%~dp0" && ( if exist "%temp%\getadmin.vbs" del "%temp%\getadmin.vbs" ) && fsutil dirty query %systemdrive% 1>nul 2>nul || (  echo Set UAC = CreateObject^("Shell.Application"^) : UAC.ShellExecute "cmd.exe", "/k cd ""%~sdp0"" && %~s0 %params%", "", "runas", 1 >> "%temp%\getadmin.vbs" && "%temp%\getadmin.vbs" && exit /B )
+cmd /k "cd /d ''' + prog_location + '''/venv/Scripts & activate & cd /d    ''' + prog_location + ''' & python client_big_project.py"''')
 
 
 def recv_watch():
@@ -155,21 +157,21 @@ def waitingwindow():
     # create a window showing 'lock computer'
     wa = tk.Tk()
     # this removes the maximize button
-    wa.state('zoomed')
+    # wa.state('zoomed')
     wa.attributes("-topmost", True)
     wa.overrideredirect(1)
-    wa.title('YOUR COMPUTER IS LOCKED')
-    wa.protocol("WM_DELETE_WINDOW", exb)
-    wa.protocol("WM_MINIMIZE_WINDOW", exb)
+    wa.title('ControlNet - YOUR COMPUTER IS LOCKED')
+    wa.focus_set()  # <-- move focus to this widget
+    wa.protocol("WM_DELETE_WINDOW", exb)  # hide close button
+    wa.protocol("WM_MINIMIZE_WINDOW", exb)  # hide minimize button
     x = wa.winfo_screenwidth()
     y = wa.winfo_screenheight()
-    wa.geometry("%dx%d" % (x, y))
+    wa.geometry("%dx%d" % (x, y))  # full screen
     lb1 = tk.Label(wa, text="YOUR COMPUTER IS LOCKED\n", font=("Arial Bold", 70), pady=200, fg="RED")
     lb1.pack()
-    wa.lift()
-    # wa.mainloop()
-    wa.update()
+    wa.call('wm', 'attributes', '.', '-topmost', '1')  # lift to the top
     while shelf['activation'] is True:
+        wa.update()
         time.sleep(0.1)
     print("destroy")
     wa.destroy()
@@ -207,7 +209,7 @@ class Client(Thread):
         self.client_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
         self.client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         send_thread = threading.Thread(target=client_send, args=())
-        send_thread.start()
+        #send_thread.start()
 
     def socket_send(self, conn_socket, message):
         # gets the socket object and the message to send, and send it to the server.
@@ -246,7 +248,7 @@ class Client(Thread):
         screen = pygame.display.set_mode((self.WIDTH, self.HEIGHT), pygame.FULLSCREEN)
         clock = pygame.time.Clock()
         self.client_socket.settimeout(3)
-        alwaysOnTop(True)
+        alwaysOnTop(1)
         watching = True
         # print other computer screen
         """if check_q.empty() is False:
@@ -257,7 +259,7 @@ class Client(Thread):
                 break"""
         try:
             while watching:
-                alwaysOnTop(True)
+                alwaysOnTop(1)
                 for event in pygame.event.get():
                     if event.type == pygame.KEYDOWN:
                         print("close")
@@ -314,17 +316,16 @@ class Client(Thread):
         if command == "lock_screen":
             print("lock")
             shelf['activation'] = True
+            shelf['command_execute'] = "lock_screen"
             run2_thread = threading.Thread(target=run_batch, args="0")
             run2_thread.start()
             time.sleep(0.5)
             lock_thread = threading.Thread(target=waitingwindow, args=())
             lock_thread.start()
-            # self.lock_screen(True)
         if command == "unlock_screen":
             print("unlock")
             shelf['activation'] = False
-            # os.system(BATCH_LOCK + " 0")
-            # self.lock_screen(False)
+            shelf['command_execute'] = "unlock_screen"
         if command == "turn_off_computer":
             print("turn off computer")
             time.sleep(1)
@@ -335,6 +336,9 @@ class Client(Thread):
             watch_thread = threading.Thread(target=control_mss, args=())
             watch_thread.start()
             # control_mss()
+        if command == "send_file":
+            print("send_file")
+            
 
     def run(self):
         # runs client listening.
@@ -342,8 +346,13 @@ class Client(Thread):
         self.client_socket.sendto("new client".encode(), (self.server_ip, self.port))
         data, address = self.client_socket.recvfrom(self.max_bytes)
         if data.decode() != "connected":
-            computer_name = str(input("enter your computer name/number"))
+            computer_name = str(input("Enter your name or your computer name"))
             while True:
+                while True:
+                    if len(computer_name) > 15 or len(computer_name) == 0 or " " in computer_name:
+                        computer_name = str(input("Invalid name. Enter your name between 1-15 characters and no spaces"))
+                    else:
+                        break
                 computer_data = ("new client" + computer_name + "    " + self.mac).encode()
                 self.client_socket.sendto(computer_data, (self.server_ip, self.port))
                 data, address = self.client_socket.recvfrom(self.max_bytes)
@@ -351,11 +360,11 @@ class Client(Thread):
                     break
                 computer_name = str(input(data.decode()))
 
-        if shelf['command_execute'] != "":
+        """if shelf['command_execute'] != "":
             if shelf['command_execute'] == "lock_screen":
                 self.command_response("lock_screen")
-            if shelf['command_execute'] == "lock_screen":
-                self.command_response("unlock_screen")
+            if shelf['command_execute'] == "unlock_screen":
+                self.command_response("unlock_screen")"""
         while True:
             try:
                 print("run")
@@ -364,7 +373,9 @@ class Client(Thread):
                 data = data.decode()
                 if data == "watch_stop":
                     watch_screen = False
-                # if data.startswith("command"):
+                if data == "system_quit":
+                    self.client_socket.close()
+                    break
                 self.command_response(data)
             except:
                 pass

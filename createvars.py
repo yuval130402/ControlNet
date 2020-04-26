@@ -23,11 +23,6 @@ def createShelfFolder():
         except OSError:
             print("Creation of the directory %s failed" % path)
 
-    #shelf = shelve.open("../vars/")  # directory for text file to save the vars
-    #shelf['activation'] = False
-    #shelf['active_flag'] = 0
-    #shelf['command_execute'] = ""
-
 
 def create_start():
     try:
