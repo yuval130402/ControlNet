@@ -19,17 +19,18 @@ import tkinter as tk
 import subprocess
 import shelve
 import createvars
-import getpass
 from pathlib import Path
 from getmac import get_mac_address as gma
+from project_variables import *
+from finals import Finals as final
 
 
 from queue import Queue
 from ctypes import windll
 SetWindowPos = windll.user32.SetWindowPos
-createvars.create_start()
-shelf = shelve.open("../vars/")
-USER_NAME = getpass.getuser()
+#createvars.create_start()
+#shelf = shelve.open("../vars/")
+USER_NAME = os.environ["USERNAME"]
 
 NOSIZE = 1
 NOMOVE = 2
@@ -44,7 +45,7 @@ BLOCK_INPUT_LOCATION = prog_location + "/block_input.py"
 conn_q = Queue()
 check_q = Queue()
 MAX_BYTES = 65000
-# SERVER_IP = '10.70.232.229'
+# SERVER_IP = '10.70.232.166'
 SERVER_IP = '192.168.0.116'
 MAC_ADDRESS = gma().replace(":", "")
 SERVER_PORT = 9007
@@ -61,6 +62,12 @@ def add_to_startup(file_path=""):
 set "params=%*"
 cd /d "%~dp0" && ( if exist "%temp%\getadmin.vbs" del "%temp%\getadmin.vbs" ) && fsutil dirty query %systemdrive% 1>nul 2>nul || (  echo Set UAC = CreateObject^("Shell.Application"^) : UAC.ShellExecute "cmd.exe", "/k cd ""%~sdp0"" && %~s0 %params%", "", "runas", 1 >> "%temp%\getadmin.vbs" && "%temp%\getadmin.vbs" && exit /B )
 cmd /k "cd /d ''' + prog_location + '''/venv/Scripts & activate & cd /d    ''' + prog_location + ''' & python client_big_project.py"''')
+
+
+def makeService():
+    subprocess.call("start uac.bat")
+    p = r"sc create 'Test' start= demand displayname= 'Test2' binpath= 'C:\Users\Cyber40Admin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\open.bat'"
+    subprocess.call(p)
 
 
 def recv_watch():
@@ -170,7 +177,7 @@ def waitingwindow():
     lb1 = tk.Label(wa, text="YOUR COMPUTER IS LOCKED\n", font=("Arial Bold", 70), pady=200, fg="RED")
     lb1.pack()
     wa.call('wm', 'attributes', '.', '-topmost', '1')  # lift to the top
-    while shelf['activation'] is True:
+    while str(get(final.active_field)) == "1":
         wa.update()
         time.sleep(0.1)
     print("destroy")
@@ -238,17 +245,22 @@ class Client(Thread):
             zorder = (NOT_TOPMOST, TOPMOST)[yesOrNo]  # choose a flag according to bool
             hwnd = pygame.display.get_wm_info()['window']  # handle to the window
             SetWindowPos(hwnd, zorder, 0, 0, 0, 0, NOMOVE | NOSIZE)
-        data = self.socket_recv(self.client_socket, 1024).decode()
-        print(data)
-        self.width, self.height = data.split(",")
-        self.width = int(self.width)
-        self.height = int(self.height)
+        if int(get(final.width_screen)) == -1:
+            data = self.socket_recv(self.client_socket, 1024).decode()
+            print(data)
+            self.width, self.height = data.split(",")
+            self.width = int(self.width)
+            self.height = int(self.height)
+            replace(final.width_screen, self.width)
+            replace(final.height_screen, self.height)
+        else:
+            self.width = int(get(final.width_screen))
+            self.height = int(get(final.height_screen))
         # open the window
         pygame.init()
         screen = pygame.display.set_mode((self.WIDTH, self.HEIGHT), pygame.FULLSCREEN)
         clock = pygame.time.Clock()
         self.client_socket.settimeout(3)
-        alwaysOnTop(1)
         watching = True
         # print other computer screen
         """if check_q.empty() is False:
@@ -284,7 +296,9 @@ class Client(Thread):
                     pass
         finally:
             print("pygame quit")
-            shelf['activation'] = False
+            replace(final.active_field, 0)
+            replace(final.command_execute, "stop_send_screen")
+            # shelf['activation'] = False
             pygame.quit()
             self.client_socket.settimeout(None)
             pass
@@ -309,14 +323,18 @@ class Client(Thread):
         if command == "send_screen":
             mouse_thread = threading.Thread(target=show_mouse, args=())
             mouse_thread.start()
-            shelf['activation'] = True
+            replace(final.active_field, 1)
+            replace(final.command_execute, "send_screen")
+            # shelf['activation'] = True
             run1_thread = threading.Thread(target=run_batch, args="1")
             run1_thread.start()
             self.recieve_screen()
         if command == "lock_screen":
             print("lock")
-            shelf['activation'] = True
-            shelf['command_execute'] = "lock_screen"
+            replace(final.active_field, 1)
+            replace(final.command_execute, "lock_screen")
+            # shelf['activation'] = True
+            # shelf['command_execute'] = "lock_screen"
             run2_thread = threading.Thread(target=run_batch, args="0")
             run2_thread.start()
             time.sleep(0.5)
@@ -324,8 +342,10 @@ class Client(Thread):
             lock_thread.start()
         if command == "unlock_screen":
             print("unlock")
-            shelf['activation'] = False
-            shelf['command_execute'] = "unlock_screen"
+            replace(final.active_field, 0)
+            replace(final.command_execute, "unlock_screen")
+            # shelf['activation'] = False
+            # shelf['command_execute'] = "unlock_screen"
         if command == "turn_off_computer":
             print("turn off computer")
             time.sleep(1)
@@ -343,8 +363,15 @@ class Client(Thread):
     def run(self):
         # runs client listening.
         global watch_screen
-        self.client_socket.sendto("new client".encode(), (self.server_ip, self.port))
-        data, address = self.client_socket.recvfrom(self.max_bytes)
+        self.client_socket.settimeout(4)
+        while True:
+            try:
+                self.client_socket.sendto("new client".encode(), (self.server_ip, self.port))
+                data, address = self.client_socket.recvfrom(self.max_bytes)
+                self.client_socket.settimeout(None)
+                break
+            except:
+                pass
         if data.decode() != "connected":
             computer_name = str(input("Enter your name or your computer name"))
             while True:
@@ -360,6 +387,19 @@ class Client(Thread):
                     break
                 computer_name = str(input(data.decode()))
 
+        """if int(get(final.width_screen)) == -1:
+            server_screen_size = self.socket_recv(self.client_socket, 1024).decode()
+            print(server_screen_size)
+            self.width, self.height = server_screen_size.split(",")
+            self.width = int(self.width)
+            self.height = int(self.height)
+            replace(final.width_screen, self.width)
+            replace(final.height_screen, self.height)"""
+
+        if str(get(final.command_execute)) == "lock_screen":
+            self.command_response("lock_screen")
+        if str(get(final.command_execute)) == "send_screen":
+            self.command_response("send_screen")
         """if shelf['command_execute'] != "":
             if shelf['command_execute'] == "lock_screen":
                 self.command_response("lock_screen")
@@ -383,6 +423,7 @@ class Client(Thread):
 
 def main():
     add_to_startup()
+    create_start()
     global client
     client = Client(MAX_BYTES)
     client.start()

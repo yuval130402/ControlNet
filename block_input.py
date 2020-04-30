@@ -1,8 +1,9 @@
 import subprocess
 from subprocess import check_output
 import sys
+from project_variables import *
 import shelve
-shelf = shelve.open("../vars/")
+# shelf = shelve.open("../vars/")
 
 
 def parser(msg, keyWord):
@@ -47,7 +48,7 @@ def unlock():
 
 def lock_device(KeyWord):
     # lock devices of the keyword
-    while shelf['activation'] is True:
+    while str(get(final.active_field)) == "1":
         devices = find_all()
         keyword_devices = parser(devices, KeyWord)
         if len(keyword_devices) != 0:
@@ -58,7 +59,7 @@ def lock_device(KeyWord):
 def lock_all():
     # lock mouse, keyboard and touch pad of the computer.
     # subprocess.Popen("devcon remove usb*")
-    while shelf['activation'] is True:
+    while str(get(final.active_field)) == "1":
         devices = find_all()
         mouse_devices = parser(devices, "mouse")
         Mouse_devices = parser(devices, "Mouse")
@@ -93,15 +94,15 @@ def main():
     lock_option = int(sys.argv[1])
     if str(lock_option) == "0":
         print("all")
-        print(shelf['activation'])
-        if shelf['activation'] is True:
+        #print(shelf['activation'])
+        if str(get(final.active_field)) == "1":
             lock_all()
         else:
             unlock()
     else:
         print("keyboard")
-        print(shelf['activation'])
-        if shelf['activation'] is True:
+        #print(shelf['activation'])
+        if str(get(final.active_field)) == "1":
             lock_device("Keyboard")
         else:
             unlock()
