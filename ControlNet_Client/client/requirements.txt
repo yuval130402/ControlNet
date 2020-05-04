@@ -1,0 +1,6 @@
+mss==5.0.0
+pygame==1.9.6
+pynput==1.6.8
+pywin32==227
+getmac==0.8.2
+six==1.14.0

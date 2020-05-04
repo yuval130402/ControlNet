@@ -1,0 +1,4 @@
+In the BIOS:
+Restart the System and press the F2 key multiple times.
+In the system, BIOS navigate to Power Management and Wake on LAN/WLAN.
+Activate the Option you wish to use. 

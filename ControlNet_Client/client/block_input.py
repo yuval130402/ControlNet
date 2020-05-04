@@ -2,6 +2,7 @@ import subprocess
 from subprocess import check_output
 import sys
 from project_variables import *
+from finals import Finals as final
 import shelve
 # shelf = shelve.open("../vars/")
 
@@ -65,12 +66,12 @@ def lock_all():
         Mouse_devices = parser(devices, "Mouse")
         touch_pad_device = parser(devices, "pad")
         keyboard_devices = parser(devices, "Keyboard")
-        print("mouse")
-        print(mouse_devices)
-        print("Mouse")
-        print(Mouse_devices)
-        print("Keyboard")
-        print(keyboard_devices)
+        # print("mouse")
+        # print(mouse_devices)
+        # print("Mouse")
+        # print(Mouse_devices)
+        # print("Keyboard")
+        # print(keyboard_devices)
         try:
             callDevcon("remove", keyboard_devices)
         except:
@@ -90,18 +91,16 @@ def lock_all():
     unlock()
 
 
-def main():
-    lock_option = int(sys.argv[1])
-    if str(lock_option) == "0":
+def lock_settings():
+    lock_option = str(get(final.command_execute))
+    if lock_option == "lock_screen":
         print("all")
-        #print(shelf['activation'])
         if str(get(final.active_field)) == "1":
             lock_all()
         else:
             unlock()
     else:
-        print("keyboard")
-        #print(shelf['activation'])
+        print("keyword")
         if str(get(final.active_field)) == "1":
             lock_device("Keyboard")
         else:
@@ -109,4 +108,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    lock_settings()

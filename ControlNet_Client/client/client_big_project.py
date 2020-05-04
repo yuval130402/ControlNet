@@ -9,7 +9,6 @@ from zlib import decompress
 from mss import mss
 import ctypes
 from socket import socket
-import pythoncom, pyWinhook
 import socket
 import pygame
 import time
@@ -17,19 +16,16 @@ from pynput.mouse import Button, Controller as MouseController, Listener as Mous
 import os
 import tkinter as tk
 import subprocess
-import shelve
-import createvars
 from pathlib import Path
 from getmac import get_mac_address as gma
 from project_variables import *
+from block_input import *
 from finals import Finals as final
 
 
 from queue import Queue
 from ctypes import windll
 SetWindowPos = windll.user32.SetWindowPos
-#createvars.create_start()
-#shelf = shelve.open("../vars/")
 USER_NAME = os.environ["USERNAME"]
 
 NOSIZE = 1
@@ -40,17 +36,17 @@ NOT_TOPMOST = -2
 prog_call = Path(__file__).absolute()
 prog_call = r'%s' % str(prog_call).replace('\\', '/')
 prog_location = os.path.split(prog_call)[0]
-BATCH_LOCK = prog_location + "/block.bat"
-BLOCK_INPUT_LOCATION = prog_location + "/block_input.py"
 conn_q = Queue()
 check_q = Queue()
-MAX_BYTES = 65000
 # SERVER_IP = '10.70.232.166'
 SERVER_IP = '192.168.0.116'
 MAC_ADDRESS = gma().replace(":", "")
 SERVER_PORT = 9007
 SECONDARY_PORT = 9562
 THIRD_PORT = 15678
+TCP_PORT = 9001
+BUFFER_SIZE = 1024
+MAX_BYTES = 65000
 
 
 def add_to_startup(file_path=""):
@@ -64,24 +60,21 @@ cd /d "%~dp0" && ( if exist "%temp%\getadmin.vbs" del "%temp%\getadmin.vbs" ) &&
 cmd /k "cd /d ''' + prog_location + '''/venv/Scripts & activate & cd /d    ''' + prog_location + ''' & python client_big_project.py"''')
 
 
-def makeService():
-    subprocess.call("start uac.bat")
-    p = r"sc create 'Test' start= demand displayname= 'Test2' binpath= 'C:\Users\Cyber40Admin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\open.bat'"
-    subprocess.call(p)
+#def makeService():
+    #subprocess.call("start uac.bat")
+    #p = r"sc create 'Test' start= demand displayname= 'Test2' binpath= 'C:\Users\Cyber40Admin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\open.bat'"
+    #subprocess.call(p)
 
 
 def recv_watch():
     global watch_screen
     data, address = watch_client_socket.recvfrom(1024)
     if data.decode() == "watch_stop":
-        print("kkk")
         watch_screen = False
 
 
 def control_mss():
     # the function photographs the student's screen and sends it to the teacher
-    global watch_screen
-    watch_screen = True
     global watch_client_socket
     watch_client_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
     watch_client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -91,7 +84,7 @@ def control_mss():
     # recv_watch_thread.start()
     with mss() as sct:
         rect = {'top': 0, 'left': 0, 'width': client.WIDTH, 'height': client.HEIGHT}
-        while watch_screen:
+        while str(get(final.command_execute)) == "watch_screen":
             try:
                 img = sct.grab(rect)
                 pixels = compress(img.rgb, 6)
@@ -163,11 +156,8 @@ def exb():
 def waitingwindow():
     # create a window showing 'lock computer'
     wa = tk.Tk()
-    # this removes the maximize button
-    # wa.state('zoomed')
-    wa.attributes("-topmost", True)
-    wa.overrideredirect(1)
     wa.title('ControlNet - YOUR COMPUTER IS LOCKED')
+    wa.state('zoomed')
     wa.focus_set()  # <-- move focus to this widget
     wa.protocol("WM_DELETE_WINDOW", exb)  # hide close button
     wa.protocol("WM_MINIMIZE_WINDOW", exb)  # hide minimize button
@@ -177,6 +167,9 @@ def waitingwindow():
     lb1 = tk.Label(wa, text="YOUR COMPUTER IS LOCKED\n", font=("Arial Bold", 70), pady=200, fg="RED")
     lb1.pack()
     wa.call('wm', 'attributes', '.', '-topmost', '1')  # lift to the top
+    wa.attributes("-topmost", True)
+    wa.overrideredirect(1)
+    # wa.lift()
     while str(get(final.active_field)) == "1":
         wa.update()
         time.sleep(0.1)
@@ -184,9 +177,28 @@ def waitingwindow():
     wa.destroy()
 
 
-def run_batch(param):
-    # run the batch file with the parameter it gets
-    os.system(BATCH_LOCK + " " + BLOCK_INPUT_LOCATION + " " + param)
+def get_file():
+    tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    tcp_client.connect((SERVER_IP, TCP_PORT))
+    file_path = tcp_client.recv(BUFFER_SIZE).decode()
+    file_name = os.path.split(file_path)[1]
+    print(file_name)
+    print(final.files_from_server_path)
+    with open(final.files_from_server_path + file_name, 'wb') as f:
+        print('file opened')
+        while True:
+            # print('receiving data...')
+            data = tcp_client.recv(BUFFER_SIZE)
+            # print('data=%s', (data))
+            if not data:
+                f.close()
+                print('file close()')
+                break
+            # write data to a file
+            f.write(data)
+
+    print('Successfully get the file')
+    tcp_client.close()
 
 
 def client_send():
@@ -279,7 +291,7 @@ class Client(Thread):
                         pygame.quit()
                         break
                 size = int.from_bytes(self.socket_recv(self.client_socket, self.max_bytes), byteorder='big')
-                print("1")
+                # print("1")
                 while size > 10000000:  # checks if it size and not part of the pixels
                     size = int.from_bytes(self.socket_recv(self.client_socket, self.max_bytes), byteorder='big')
                 temp_pixels = self.recvall(size)
@@ -298,44 +310,26 @@ class Client(Thread):
             print("pygame quit")
             replace(final.active_field, 0)
             replace(final.command_execute, "stop_send_screen")
-            # shelf['activation'] = False
             pygame.quit()
             self.client_socket.settimeout(None)
             pass
 
-    def uMad(self, event):
-        return False
-
-    def lock_screen(self, lock):
-        hm = pyWinhook.HookManager()
-        if lock is True:
-            hm.MouseAll = self.uMad
-            hm.KeyAll = self.uMad
-            hm.HookMouse()
-            hm.HookKeyboard()
-            #pythoncom.PumpMessages()
-        else:
-            hm.UnhookMouse()
-            hm.UnhookKeyboard()
-
     def command_response(self, command):
         # gets a string of the selected command and handle it.
         if command == "send_screen":
+            print("send_screen")
             mouse_thread = threading.Thread(target=show_mouse, args=())
             mouse_thread.start()
             replace(final.active_field, 1)
             replace(final.command_execute, "send_screen")
-            # shelf['activation'] = True
-            run1_thread = threading.Thread(target=run_batch, args="1")
+            run1_thread = threading.Thread(target=lock_settings, args=())
             run1_thread.start()
             self.recieve_screen()
         if command == "lock_screen":
             print("lock")
             replace(final.active_field, 1)
             replace(final.command_execute, "lock_screen")
-            # shelf['activation'] = True
-            # shelf['command_execute'] = "lock_screen"
-            run2_thread = threading.Thread(target=run_batch, args="0")
+            run2_thread = threading.Thread(target=lock_settings, args=())
             run2_thread.start()
             time.sleep(0.5)
             lock_thread = threading.Thread(target=waitingwindow, args=())
@@ -344,25 +338,30 @@ class Client(Thread):
             print("unlock")
             replace(final.active_field, 0)
             replace(final.command_execute, "unlock_screen")
-            # shelf['activation'] = False
-            # shelf['command_execute'] = "unlock_screen"
         if command == "turn_off_computer":
             print("turn off computer")
+            replace(final.command_execute, "turn_off_computer")
             time.sleep(1)
             os.system('shutdown /p /f')
         if command == "watch_screen":
             print("watch_screen")
+            replace(final.command_execute, "watch_screen")
             time.sleep(0.5)
             watch_thread = threading.Thread(target=control_mss, args=())
             watch_thread.start()
             # control_mss()
+        if command == "watch_stop":
+            print("watch_stop")
+            replace(final.command_execute, "watch_stop")
         if command == "send_file":
             print("send_file")
-            
+            replace(final.command_execute, "get_file")
+            watch_thread = threading.Thread(target=get_file, args=())
+            watch_thread.start()
 
     def run(self):
         # runs client listening.
-        global watch_screen
+        # global watch_screen
         self.client_socket.settimeout(4)
         while True:
             try:
@@ -400,19 +399,13 @@ class Client(Thread):
             self.command_response("lock_screen")
         if str(get(final.command_execute)) == "send_screen":
             self.command_response("send_screen")
-        """if shelf['command_execute'] != "":
-            if shelf['command_execute'] == "lock_screen":
-                self.command_response("lock_screen")
-            if shelf['command_execute'] == "unlock_screen":
-                self.command_response("unlock_screen")"""
+
         while True:
             try:
                 print("run")
                 data, address = self.client_socket.recvfrom(self.max_bytes)
-                print(data)
                 data = data.decode()
-                if data == "watch_stop":
-                    watch_screen = False
+                print(data)
                 if data == "system_quit":
                     self.client_socket.close()
                     break
