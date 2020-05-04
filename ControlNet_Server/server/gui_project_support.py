@@ -10,16 +10,15 @@
  gui_project_support.py - The file contains the UI functionality"""
 
 import sys
-import common
+from server_globals import common as common
 import threading
 import time
-from threading import Thread
 import server_big_project
 try:
     import Tkinter as tk
 except ImportError:
     import tkinter as tk
-
+from tkinter import messagebox
 try:
     import ttk
     py3 = False
@@ -32,6 +31,10 @@ def lock_button(p1):
     common.selected_clients = selection_list()
     if len(common.selected_clients) != 0:
         common.conn_q.put("lock")
+        #disable_buttons()
+        w.Unlock_button.bind('<Button-1>', lambda e: unlock_button(e))
+        w.Unlock_button["state"] = 'normal'
+        w.Unlock_button["cursor"] = 'hand2'
     # sys.stdout.flush()
 
 def unlock_button(p1):
@@ -39,6 +42,7 @@ def unlock_button(p1):
     common.selected_clients = selection_list()
     if len(common.selected_clients) != 0:
         common.conn_q.put("unlock")
+        enable_buttons()
     # sys.stdout.flush()
 
 def start_share_screen(p1):
@@ -48,6 +52,10 @@ def start_share_screen(p1):
         common.sharing_screen = True
         common.picture_flag = 1
         common.conn_q.put("send_screen")
+        disable_buttons()
+        w.Stop_Sharing.bind('<Button-1>', lambda e: stop_share_screen(e))
+        w.Stop_Sharing["state"] = 'normal'
+        w.Stop_Sharing["cursor"] = 'hand2'
     # sys.stdout.flush()
 
 def stop_share_screen(p1):
@@ -57,22 +65,29 @@ def stop_share_screen(p1):
         common.picture_flag = 0
         time.sleep(0.5)
         common.conn_q.put("send_stop")
+        enable_buttons()
     # sys.stdout.flush()
 
 def send_file(p1):
     # The function is called when the manager presses the send-file button
-    print('gui_project_support.send_file')
+    common.selected_clients = selection_list()
+    if len(common.selected_clients) != 0:
+        common.conn_q.put("send_file")
     # sys.stdout.flush()
 
 def turn_off(p1):
     # The function is called when the manager presses the turn-off button
-    common.conn_q.put("turn_off")
+    common.selected_clients = selection_list()
+    if len(common.selected_clients) != 0:
+        common.conn_q.put("turn_off")
     # sys.stdout.flush()
 
 def turn_on(p1):
     # The function is called when the manager presses the turn-on button
-    print('gui_project_support.turn_on')
-    sys.stdout.flush()
+    common.selected_clients = selection_list()
+    if len(common.selected_clients) != 0:
+        common.conn_q.put("turn_on")
+    # sys.stdout.flush()
 
 def watch_client(p1):
     # The function is called when the manager presses the watch-client-screen button
@@ -86,16 +101,74 @@ def init(top, gui, *args, **kwargs):
     w = gui
     top_level = top
     root = top
-    import server_big_project
+    top_level.protocol("WM_DELETE_WINDOW", destroy_window)
     main_connected = threading.Thread(target=server_big_project.main(), args=())
     main_connected.start()
     top.after(100, on_after_elapsed)
 
+def disable_buttons():
+    global w, top_level
+    w.Lock_Button.unbind("<Button-1>")
+    w.Lock_Button["state"] = 'disabled'
+    w.Lock_Button["cursor"] = ''
+    w.Unlock_button.unbind("<Button-1>")
+    w.Unlock_button["state"] = 'disabled'
+    w.Unlock_button["cursor"] = ''
+    w.Start_Sharing.unbind("<Button-1>")
+    w.Start_Sharing["state"] = 'disabled'
+    w.Start_Sharing["cursor"] = ''
+    w.Stop_Sharing.unbind("<Button-1>")
+    w.Stop_Sharing["state"] = 'disabled'
+    w.Stop_Sharing["cursor"] = ''
+    w.TurnOn_Button.unbind("<Button-1>")
+    w.TurnOn_Button["state"] = 'disabled'
+    w.TurnOn_Button["cursor"] = ''
+    w.TurnOff_Button.unbind("<Button-1>")
+    w.TurnOff_Button["state"] = 'disabled'
+    w.TurnOff_Button["cursor"] = ''
+    w.SendFile_Button.unbind("<Button-1>")
+    w.SendFile_Button["state"] = 'disabled'
+    w.SendFile_Button["cursor"] = ''
+    w.WatchScreen_Button.unbind("<Button-1>")
+    w.WatchScreen_Button["state"] = 'disabled'
+    w.WatchScreen_Button["cursor"] = ''
+
+def enable_buttons():
+    global w, top_level
+    w.Lock_Button.bind('<Button-1>',lambda e: lock_button(e))
+    w.Lock_Button["state"] = 'normal'
+    w.Lock_Button["cursor"] = 'hand2'
+    w.Unlock_button.bind('<Button-1>', lambda e: unlock_button(e))
+    w.Unlock_button["state"] = 'normal'
+    w.Unlock_button["cursor"] = 'hand2'
+    w.Start_Sharing.bind('<Button-1>', lambda e: start_share_screen(e))
+    w.Start_Sharing["state"] = 'normal'
+    w.Start_Sharing["cursor"] = 'hand2'
+    w.Stop_Sharing.bind('<Button-1>', lambda e: stop_share_screen(e))
+    w.Stop_Sharing["state"] = 'normal'
+    w.Stop_Sharing["cursor"] = 'hand2'
+    w.TurnOn_Button.bind('<Button-1>', lambda e: turn_on(e))
+    w.TurnOn_Button["state"] = 'normal'
+    w.TurnOn_Button["cursor"] = 'hand2'
+    w.TurnOff_Button.bind('<Button-1>', lambda e: turn_off(e))
+    w.TurnOff_Button["state"] = 'normal'
+    w.TurnOff_Button["cursor"] = 'hand2'
+    w.SendFile_Button.bind('<Button-1>', lambda e: send_file(e))
+    w.SendFile_Button["state"] = 'normal'
+    w.SendFile_Button["cursor"] = 'hand2'
+    w.WatchScreen_Button.bind('<Button-1>', lambda e: watch_client(e))
+    w.WatchScreen_Button["state"] = 'normal'
+    w.WatchScreen_Button["cursor"] = 'hand2'
+
 def destroy_window():
     # Function which closes the window.
-    global top_level
-    top_level.destroy()
-    top_level = None
+    global w, top_level
+    MsgBox = tk.messagebox.askquestion('Exit Application', 'Are you sure you want to exit the program?', icon='warning')
+    if MsgBox == 'yes':
+        root.destroy()
+        common.conn_q.put("system_quit")
+    else:
+        tk.messagebox.showinfo('Return', 'You will now return to the program screen')
 
 def on_after_elapsed():
     # A function that adds a student to the list of students
