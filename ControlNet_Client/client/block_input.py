@@ -60,35 +60,38 @@ def lock_device(KeyWord):
 def lock_all():
     # lock mouse, keyboard and touch pad of the computer.
     # subprocess.Popen("devcon remove usb*")
-    while str(get(final.active_field)) == "1":
-        devices = find_all()
-        mouse_devices = parser(devices, "mouse")
-        Mouse_devices = parser(devices, "Mouse")
-        touch_pad_device = parser(devices, "pad")
-        keyboard_devices = parser(devices, "Keyboard")
-        # print("mouse")
-        # print(mouse_devices)
-        # print("Mouse")
-        # print(Mouse_devices)
-        # print("Keyboard")
-        # print(keyboard_devices)
-        try:
-            callDevcon("remove", keyboard_devices)
-        except:
-            pass
-        try:
-            callDevcon("remove", mouse_devices)
-        except:
-            pass
-        try:
-            callDevcon("remove", touch_pad_device)
-        except:
-            pass
-        try:
-            callDevcon("remove", Mouse_devices)
-        except:
-            pass
-    unlock()
+    try:
+        while str(get(final.active_field)) == "1":
+            devices = find_all()
+            mouse_devices = parser(devices, "mouse")
+            Mouse_devices = parser(devices, "Mouse")
+            touch_pad_device = parser(devices, "pad")
+            keyboard_devices = parser(devices, "Keyboard")
+            # print("mouse")
+            # print(mouse_devices)
+            # print("Mouse")
+            # print(Mouse_devices)
+            # print("Keyboard")
+            # print(keyboard_devices)
+            try:
+                callDevcon("remove", keyboard_devices)
+            except:
+                pass
+            try:
+                callDevcon("remove", mouse_devices)
+            except:
+                pass
+            try:
+                callDevcon("remove", touch_pad_device)
+            except:
+                pass
+            try:
+                callDevcon("remove", Mouse_devices)
+            except:
+                pass
+        unlock()
+    except:
+        unlock()
 
 
 def lock_settings():

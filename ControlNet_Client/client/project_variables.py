@@ -21,11 +21,12 @@ def create_vars_folder(path):
         print("Creation of the directory %s failed" % path)
     else:
         print("Successfully created the directory %s " % path)
-        if path == "../vars/":
+        if path == str(final.first_setup_path):
             create_var(final.active_field, 0)
             create_var(final.command_execute, "")
             create_var(final.width_screen, -1)
             create_var(final.height_screen, -1)
+            create_var(final.client_name, "")
 
 
 def create_var(var, value):

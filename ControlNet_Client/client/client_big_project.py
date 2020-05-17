@@ -21,12 +21,22 @@ from getmac import get_mac_address as gma
 from project_variables import *
 from block_input import *
 from finals import Finals as final
+import pathlib
+import shutil
+from multiprocessing import Process
+import gui_client
+import gui_client_support
+import send_gui
+import send_gui_support
+import win32console
+import win32gui
 
+#Hide the Console
+#window = win32console.GetConsoleWindow()
+#win32gui.ShowWindow(window, 0)
 
-from queue import Queue
 from ctypes import windll
 SetWindowPos = windll.user32.SetWindowPos
-USER_NAME = os.environ["USERNAME"]
 
 NOSIZE = 1
 NOMOVE = 2
@@ -36,33 +46,52 @@ NOT_TOPMOST = -2
 prog_call = Path(__file__).absolute()
 prog_call = r'%s' % str(prog_call).replace('\\', '/')
 prog_location = os.path.split(prog_call)[0]
-conn_q = Queue()
-check_q = Queue()
 # SERVER_IP = '10.70.232.166'
-SERVER_IP = '192.168.0.116'
+# SERVER_IP = '192.168.0.116'
+BROADCAST_IP = '<broadcast>'
 MAC_ADDRESS = gma().replace(":", "")
 SERVER_PORT = 9007
 SECONDARY_PORT = 9562
 THIRD_PORT = 15678
 TCP_PORT = 9001
+TCP_PORT2 = 9005
 BUFFER_SIZE = 1024
 MAX_BYTES = 65000
 
+src = sys.executable
+print(src)
+config_name = 'client_big_project.exe'
 
-def add_to_startup(file_path=""):
-    if file_path == "":
-        file_path = prog_call
-    bat_path = r'C:\Users\%s\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup' % USER_NAME
-    with open(bat_path + '\\' + "open.bat", "w+") as bat_file:
-        bat_file.write('''@echo off
-set "params=%*"
-cd /d "%~dp0" && ( if exist "%temp%\getadmin.vbs" del "%temp%\getadmin.vbs" ) && fsutil dirty query %systemdrive% 1>nul 2>nul || (  echo Set UAC = CreateObject^("Shell.Application"^) : UAC.ShellExecute "cmd.exe", "/k cd ""%~sdp0"" && %~s0 %params%", "", "runas", 1 >> "%temp%\getadmin.vbs" && "%temp%\getadmin.vbs" && exit /B )
-cmd /k "cd /d ''' + prog_location + '''/venv/Scripts & activate & cd /d    ''' + prog_location + ''' & python client_big_project.py"''')
+# determine if application is a script file or frozen exe
+if getattr(sys, 'frozen', False):
+    application_path = os.path.dirname(sys.executable)
+else:
+    application_path = os.path.dirname(__file__)
+print(application_path)
+config_path = os.path.join(application_path, config_name)
+print(config_path)
 
+
+def add_to_startup():
+    file_folder = str(pathlib.Path(__file__).parent.absolute())
+    print(file_folder)
+    devconMove = r'C:\Users\%s\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup' % final.USER_NAME + "\\devcon.exe"
+    file_path_move = r'C:\Users\%s\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup' % final.USER_NAME + "\\client_big_project.exe"
+    devconCurrent = file_folder + "\\devcon.exe"
+    file_path_current = file_folder + "\\client_big_project.exe"
+    print(devconCurrent)
+    print(file_path_current)
+    shutil.move(file_path_current, file_path_move)
+    shutil.move(devconCurrent, devconMove)
+
+
+# convert to exe file -
+# pyinstaller --onefile --uac-admin client_big_project.py
+# pyinstaller --onefile --uac-admin --noconsole client_big_project.py -r prog.exe.manifest,1
 
 #def makeService():
     #subprocess.call("start uac.bat")
-    #p = r"sc create 'Test' start= demand displayname= 'Test2' binpath= 'C:\Users\Cyber40Admin\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup\open.bat'"
+    #p = r"sc create "ControlNet" binPath= "C:\Users\Yuval\Desktop\big_project\dist\client_big_project.exe" DisplayName= "My Custom Service""
     #subprocess.call(p)
 
 
@@ -79,7 +108,7 @@ def control_mss():
     watch_client_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
     watch_client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     screen_size = "{},{}".format(client.WIDTH, client.HEIGHT)
-    watch_client_socket.sendto(screen_size.encode(), (SERVER_IP, THIRD_PORT))
+    watch_client_socket.sendto(screen_size.encode(), (final.SERVER_IP, THIRD_PORT))
     # recv_watch_thread = threading.Thread(target=recv_watch, args=())
     # recv_watch_thread.start()
     with mss() as sct:
@@ -91,17 +120,17 @@ def control_mss():
                 size = len(pixels)
                 size_len = (size.bit_length() + 7) // 8
                 size_bytes = size.to_bytes(size_len, 'big')
-                watch_client_socket.sendto(size_bytes, (SERVER_IP, THIRD_PORT))
+                watch_client_socket.sendto(size_bytes, (final.SERVER_IP, THIRD_PORT))
                 sleep = False
                 if size > 200000:
                     sleep = True
                 while client.max_bytes < len(pixels):
                     part_pixels = pixels[:client.max_bytes]
-                    watch_client_socket.sendto(part_pixels, (SERVER_IP, THIRD_PORT))
+                    watch_client_socket.sendto(part_pixels, (final.SERVER_IP, THIRD_PORT))
                     if sleep:
                         time.sleep(0.001)
                     pixels = pixels[client.max_bytes:]
-                watch_client_socket.sendto(pixels, (SERVER_IP, THIRD_PORT))
+                watch_client_socket.sendto(pixels, (final.SERVER_IP, THIRD_PORT))
             except:
                 pass
             time.sleep(0.01)
@@ -135,13 +164,15 @@ def show_mouse():
     mouse_client_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
     mouse_client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     time.sleep(0.3)
-    mouse_client_socket.sendto("connected".encode(), (SERVER_IP, SECONDARY_PORT))
+    mouse_client_socket.sendto("connected".encode(), (final.SERVER_IP, SECONDARY_PORT))
     print("yes")
     while True:
         data, address = mouse_client_socket.recvfrom(MAX_BYTES)
         data = data.decode()
         if data == "stop_mouse":
             print("stop_send_screen")
+            if str(get(final.command_execute)) != "watch_stop":
+                replace(final.command_execute, "watch_stop")
             # check_q.put("stop_send")
             break
         data = data.split(",")
@@ -179,7 +210,7 @@ def waitingwindow():
 
 def get_file():
     tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    tcp_client.connect((SERVER_IP, TCP_PORT))
+    tcp_client.connect((final.SERVER_IP, TCP_PORT))
     file_path = tcp_client.recv(BUFFER_SIZE).decode()
     file_name = os.path.split(file_path)[1]
     print(file_name)
@@ -204,9 +235,14 @@ def get_file():
 def client_send():
     # The function is responsible for sending information from the client
     while True:
-        if conn_q.empty() == False:
-            data = conn_q.get()
-            print("client_send:" + data)
+        if final.conn_q.empty() is False:
+            data = final.conn_q.get()
+            if str(data) == "stop_system":
+                break
+            if str(data).startswith("new client"):
+                replace(final.client_name, str(data[10:]))
+                data = data + "    " + client.mac
+                print("client_send:" + data)
             client.socket_send(client.client_socket, data)
         time.sleep(0.05)  # sleep a little before check the queue again
 
@@ -221,14 +257,14 @@ class Client(Thread):
         self.WIDTH = user32.GetSystemMetrics(0)
         self.HEIGHT = user32.GetSystemMetrics(1)
         self.max_bytes = max_bytes
-        self.server_ip = SERVER_IP
+        self.server_ip = ""
         self.port = SERVER_PORT
         self.mac = MAC_ADDRESS
         self.mouse = MouseController()
         self.client_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
         self.client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         send_thread = threading.Thread(target=client_send, args=())
-        #send_thread.start()
+        send_thread.start()
 
     def socket_send(self, conn_socket, message):
         # gets the socket object and the message to send, and send it to the server.
@@ -365,27 +401,27 @@ class Client(Thread):
         self.client_socket.settimeout(4)
         while True:
             try:
-                self.client_socket.sendto("new client".encode(), (self.server_ip, self.port))
+                self.client_socket.sendto("new client".encode(), (BROADCAST_IP, self.port))
                 data, address = self.client_socket.recvfrom(self.max_bytes)
+                self.server_ip = address[0]
+                final.SERVER_IP = self.server_ip
                 self.client_socket.settimeout(None)
                 break
             except:
                 pass
         if data.decode() != "connected":
-            computer_name = str(input("Enter your name or your computer name"))
+            guiname_thread = threading.Thread(target=gui_client.vp_start_gui, args=())
+            guiname_thread.start()
             while True:
-                while True:
-                    if len(computer_name) > 15 or len(computer_name) == 0 or " " in computer_name:
-                        computer_name = str(input("Invalid name. Enter your name between 1-15 characters and no spaces"))
-                    else:
-                        break
-                computer_data = ("new client" + computer_name + "    " + self.mac).encode()
-                self.client_socket.sendto(computer_data, (self.server_ip, self.port))
                 data, address = self.client_socket.recvfrom(self.max_bytes)
                 if data.decode() == "welcome":
+                    final.error_message = ""
                     break
-                computer_name = str(input(data.decode()))
+                final.error_message = str(data.decode())
+            guiname_thread.join()
 
+        send_gui_thread = threading.Thread(target=send_gui.vp_start_gui, args=())
+        send_gui_thread.start()
         """if int(get(final.width_screen)) == -1:
             server_screen_size = self.socket_recv(self.client_socket, 1024).decode()
             print(server_screen_size)
@@ -407,15 +443,22 @@ class Client(Thread):
                 data = data.decode()
                 print(data)
                 if data == "system_quit":
-                    self.client_socket.close()
+                    final.conn_q.put("stop_system")
                     break
                 self.command_response(data)
             except:
                 pass
+        final.end_gui = True
+        # send_gui_support.destroy_window()
+        send_gui_thread.join()
+        self.client_socket.close()
 
 
 def main():
-    add_to_startup()
+    try:
+        add_to_startup()
+    except:
+        pass
     create_start()
     global client
     client = Client(MAX_BYTES)
