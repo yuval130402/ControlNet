@@ -5,6 +5,7 @@
 #  in conjunction with Tcl version 8.6
 #    Jan 19, 2020 05:02:54 PM +0200  platform: Windows NT
 #    Feb 28, 2020 04:59:19 PM +0200  platform: Windows NT
+#    May 11, 2020 02:42:19 PM +0300  platform: Windows NT
 """gui_project.py - A file responsible for the user interface
  presented to the manager of the class, it is automatically built by page.
  gui_project_support.py - The file contains the UI functionality"""
@@ -25,6 +26,20 @@ try:
 except ImportError:
     import tkinter.ttk as ttk
     py3 = True
+
+def over_on(p1, btn):
+    if btn == "Select_All":
+        select_all["background"] = "#b7d2fd"
+    else:
+        clear_selection["background"] = "#b7d2fd"
+    # sys.stdout.flush()
+
+def over_off(p1, btn):
+    if btn == "Select_All":
+        select_all["background"] = "#83b4fc"
+    else:
+        clear_selection["background"] = "#83b4fc"
+    # sys.stdout.flush()
 
 def lock_button(p1):
     # The function is called when the manager presses the lock button
@@ -97,10 +112,12 @@ def watch_client(p1):
     # sys.stdout.flush()
 
 def init(top, gui, *args, **kwargs):
-    global w, top_level, root
+    global w, top_level, root, select_all, clear_selection
     w = gui
     top_level = top
     root = top
+    select_all = w.Select_All
+    clear_selection = w.Clear_Selection
     top_level.protocol("WM_DELETE_WINDOW", destroy_window)
     main_connected = threading.Thread(target=server_big_project.main(), args=())
     main_connected.start()
@@ -163,12 +180,12 @@ def enable_buttons():
 def destroy_window():
     # Function which closes the window.
     global w, top_level
-    MsgBox = tk.messagebox.askquestion('Exit Application', 'Are you sure you want to exit the program?', icon='warning')
+    MsgBox = tk.messagebox.askquestion('Exit ControlNet', 'Are you sure you want to exit the program?', icon='warning')
     if MsgBox == 'yes':
         root.destroy()
         common.conn_q.put("system_quit")
     else:
-        tk.messagebox.showinfo('Return', 'You will now return to the program screen')
+        tk.messagebox.showinfo('Return ControlNet', 'You will now return to the program screen')
 
 def on_after_elapsed():
     # A function that adds a student to the list of students
@@ -216,7 +233,6 @@ def clear_selection_listbox(p1):
 if __name__ == '__main__':
     import gui_project
     gui_project.vp_start_gui()
-
 
 
 

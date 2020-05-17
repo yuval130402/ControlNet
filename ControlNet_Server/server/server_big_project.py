@@ -29,9 +29,11 @@ SERVER_PORT = 9007
 SECONDARY_PORT = 9562
 THIRD_PORT = 15678
 TCP_PORT = 9001
+TCP_PORT2 = 9005
 BUFFER_SIZE = 1024
 MAX_BYTES = 65000
 NETMASK = '255.255.252.0'
+files_from_clients_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop') + '\\ControlNet_files\\'
 
 
 class Clients:
@@ -143,7 +145,6 @@ class Clients:
 
 
 class ClientThread(Thread):
-
     def __init__(self, ip, port, sock):
         Thread.__init__(self)
         self.ip = ip
@@ -191,6 +192,7 @@ def send_files():
 
     for t in threads:
         t.join()
+    print("tcp socket close")
     tcpsock.close()
 
 
@@ -309,13 +311,16 @@ def recieve_screen(clients_list):
     watch_server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     watch_server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     watch_server_socket.bind((SERVER_IP, THIRD_PORT))
-    data, watch_address = watch_server_socket.recvfrom(1024)
-    print(data)
-    print(watch_address)
-    data = data.decode()
-    width, height = data.split(",")
-    width = int(width)
-    height = int(height)
+    try:
+        data, watch_address = watch_server_socket.recvfrom(1024)
+        print(data)
+        print(watch_address)
+        data = data.decode()
+        width, height = data.split(",")
+        manager.width = int(width)
+        manager.height = int(height)
+    except:
+        pass
     # open the window
     pygame.init()
     screen = pygame.display.set_mode((manager.WIDTH, manager.HEIGHT))
@@ -342,7 +347,7 @@ def recieve_screen(clients_list):
                 temp_pixels = recvall(size)
                 pixels = decompress(temp_pixels)
                 # Create the Surface from raw pixels
-                img = pygame.image.fromstring(pixels, (width, height), 'RGB')
+                img = pygame.image.fromstring(pixels, (manager.width, manager.height), 'RGB')
                 picture = pygame.transform.scale(img, (manager.WIDTH, manager.HEIGHT))
                 # Display the picture
                 screen.blit(picture, (0, 0))
@@ -358,7 +363,7 @@ def recieve_screen(clients_list):
 
 
 def turn_on_computers(clients_list):
-    turn_on_path = ".\\wolcmd\\"
+    turn_on_path = ".\\"
     with open(turn_on_path + "WakeOnLan.bat", "w+") as turn_on_file:
         for client_ip in clients_list:
             client_ip = client_ip[0]
@@ -396,7 +401,7 @@ def send_commands():
     print("send commands started")
     global start_ss  # acts I should command before start send screen
     start_ss = True
-    global start_mouse_socket
+    global start_mouse_socket, end_server
     start_mouse_socket = 0
     global start_watch_socket
     start_watch_socket = 0
@@ -451,16 +456,90 @@ def send_commands():
                 file_explorer_root.withdraw()
                 global filename
                 filename = filedialog.askopenfilename(filetypes=[("all files", "*")])
-                send_files_thread = threading.Thread(target=send_files, args=())
-                send_files_thread.start()
-                selected_clients_list = selected_clients_from_their_names(common.selected_clients)
-                send_selected_clients(manager.server_socket, selected_clients_list, "send_file".encode())
+                if filename != "":
+                    send_files_thread = threading.Thread(target=send_files, args=())
+                    send_files_thread.start()
+                    selected_clients_list = selected_clients_from_their_names(common.selected_clients)
+                    send_selected_clients(manager.server_socket, selected_clients_list, "send_file".encode())
             elif data == "system_quit":
                 send_broadcast(manager.server_socket, "system_quit".encode())
                 clients_table.delete_clients()
+                end_server = True
                 manager.server_socket.close()
                 break
         time.sleep(0.01)
+
+
+class getfileThread(Thread):
+    def __init__(self, ip, port, sock):
+        Thread.__init__(self)
+        self.ip = ip
+        self.port = port
+        self.sock = sock
+        self.path = files_from_clients_path
+        print(" New thread started for "+ip+":"+str(port))
+
+    def run(self):
+        client_name = self.sock.recv(BUFFER_SIZE).decode()
+        print(client_name)
+        file_path = self.sock.recv(BUFFER_SIZE).decode()
+        print(file_path)
+        file_name = os.path.split(file_path)[1]
+        self.path = self.path + client_name + "\\"
+        create_vars_folder(self.path)
+        print(file_name)
+        print(self.path)
+        with open(self.path + file_name, 'wb') as f:
+            print('file opened')
+            while True:
+                # print('receiving data...')
+                data = self.sock.recv(BUFFER_SIZE)
+                # print('data=%s', (data))
+                if not data:
+                    f.close()
+                    print('file close()')
+                    break
+                # write data to a file
+                f.write(data)
+
+
+def get_file():
+    global end_server
+    end_server = False
+    server_getfile_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_getfile_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server_getfile_sock.bind((SERVER_IP, TCP_PORT2))
+    server_getfile_sock.settimeout(6)
+    threads = []
+
+    while True:
+        try:
+            server_getfile_sock.listen(50)
+            print("Waiting for incoming connections...")
+            (conn, (ip, port)) = server_getfile_sock.accept()
+            print('Got connection from ', (ip, port))
+            newthread = getfileThread(ip, port, conn)
+            newthread.start()
+            threads.append(newthread)
+        except:
+            if end_server is True:
+                break
+            pass
+
+    for t in threads:
+        t.join()
+    print("getfile socket close")
+    server_getfile_sock.close()
+
+
+def create_vars_folder(path):
+    # define the name of the directory to be created
+    try:
+        os.mkdir(path)
+    except OSError:
+        print("Creation of the directory %s failed" % path)
+    else:
+        print("Successfully created the directory %s " % path)
 
 
 class Server(Thread):
@@ -470,6 +549,8 @@ class Server(Thread):
         user32.SetProcessDPIAware()
         self.WIDTH = user32.GetSystemMetrics(0)
         self.HEIGHT = user32.GetSystemMetrics(1)
+        self.width = -1
+        self.height = -1
         self.max_bytes = max_bytes
         self.server_ip = SERVER_IP
         self.broadcast_ip = (BROADCAST_IP, 9006)
@@ -508,7 +589,7 @@ class Server(Thread):
                     screen_size = "{},{}".format(self.WIDTH, self.HEIGHT)
                     self.server_socket.sendto(screen_size.encode(), new_address)"""
                 else:
-                    self.server_socket.sendto("This name is exist, enter other name".encode(), new_address)
+                    self.server_socket.sendto("This name is exist, enter other name.".encode(), new_address)
         else:
             if self.appear_in_clients_list(new_address) is False:
                 clients.add(new_address)
@@ -542,6 +623,12 @@ class Server(Thread):
 def main():
     global manager
     global clients_table
+    try:
+        create_vars_folder(files_from_clients_path)
+    except:
+        pass
+    getfiles_thread = Thread(target=get_file, args=())
+    getfiles_thread.start()
     clients_table = Clients()
     manager = Server(MAX_BYTES)
     manager.start()
