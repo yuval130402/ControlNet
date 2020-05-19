@@ -20,6 +20,7 @@ except ImportError:
     py3 = True
 
 import send_gui_support
+from finals import Finals as final
 import os.path
 
 def vp_start_gui():
@@ -120,8 +121,8 @@ class ControlNet:
         self.send_button.configure(foreground="#000000")
         self.send_button.configure(highlightbackground="#d9d9d9")
         self.send_button.configure(highlightcolor="black")
-        photo_location = os.path.join(prog_location,"./fe_icon.png")
-        # photo_location = prog_location + "\\fe_icon.png"
+        photo_location = final.first_setup_path + "\\fe_icon.png"
+        # photo_location = os.path.join(prog_location,"./fe_icon.png")
         global _img0
         _img0 = tk.PhotoImage(file=photo_location)
         self.send_button.configure(image=_img0)

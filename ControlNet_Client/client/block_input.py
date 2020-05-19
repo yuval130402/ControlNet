@@ -1,6 +1,5 @@
-import subprocess
 from subprocess import check_output
-import sys
+import subprocess
 from project_variables import *
 from finals import Finals as final
 import shelve
@@ -25,7 +24,7 @@ def parser(msg, keyWord):
 
 
 def find_all():
-    msg = check_output("devcon find *")
+    msg = subprocess.check_output("devcon find *", shell=False)
     return msg
 
 
@@ -38,7 +37,7 @@ def callDevcon(command, array):
     for obj in array:
         c = "devcon " + command + " @\"" + obj + "\""
         print(c)
-        output = check_output(c)
+        output = check_output(c, shell=False)
         print(output.decode())
 
 
@@ -49,12 +48,15 @@ def unlock():
 
 def lock_device(KeyWord):
     # lock devices of the keyword
-    while str(get(final.active_field)) == "1":
-        devices = find_all()
-        keyword_devices = parser(devices, KeyWord)
-        if len(keyword_devices) != 0:
-            callDevcon("remove", keyword_devices)
-    unlock()
+    try:
+        while str(get(final.active_field)) == "1":
+            devices = find_all()
+            keyword_devices = parser(devices, KeyWord)
+            if len(keyword_devices) != 0:
+                callDevcon("remove", keyword_devices)
+        unlock()
+    except:
+        unlock()
 
 
 def lock_all():
