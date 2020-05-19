@@ -1,5 +1,12 @@
-Enable operation Wake On Lan:
-In the BIOS:
-Restart the System and press the F2 key multiple times.
+Open the BIOS (Restart the System and press the F2 key multiple times).
 In the system, BIOS navigate to Power Management and Wake on LAN/WLAN.
 Activate the Option you wish to use. 
+
+In order to use WOL, 
+you should set the Windows-side Wake-On LAN settings on the NIC that is currently CONNECTED.
+setting:
+1. "Allow the device to wake the computer" to CHECKED
+2. "Only allow a magic packet to wake the computer" to CHECKED
+3. "Energy Efficient Ethernet" to OFF
+4. Fast Startup to DISABLED (Windows 8-10 only)
+ 
