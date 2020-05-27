@@ -19,7 +19,6 @@ import os
 import tkinter as tk
 from tkinter import filedialog
 import subprocess
-import ipaddress
 
 clients = set()
 SERVER_IP = '0.0.0.0'
@@ -27,12 +26,11 @@ BROADCAST_IP = '10.70.235.252'
 # BROADCAST_IP = '10.70.235.255'
 SERVER_PORT = 9007
 SECONDARY_PORT = 9562
-THIRD_PORT = 15678
+THIRD_PORT = 15670
 TCP_PORT = 9001
 TCP_PORT2 = 9005
 BUFFER_SIZE = 1024
 MAX_BYTES = 65000
-NETMASK = '255.255.252.0'
 files_from_clients_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop') + '\\ControlNet_files\\'
 
 
@@ -227,12 +225,10 @@ def control_mss(selected_clients_list):
                 sleep = True
             while manager.max_bytes < len(pixels):
                 part_pixels = pixels[:manager.max_bytes]
-                # manager.server_socket.sendto(part_pixels, address)
                 send_selected_clients(manager.server_socket, selected_clients_list, part_pixels)
                 if sleep:
                     time.sleep(0.001)
                 pixels = pixels[manager.max_bytes:]
-            # manager.server_socket.sendto(pixels, address)
             send_selected_clients(manager.server_socket, selected_clients_list, pixels)
             if common.picture_flag == 1:
                 common.conn_q.put("send_screen")
@@ -323,7 +319,7 @@ def recieve_screen(clients_list):
         pass
     # open the window
     pygame.init()
-    screen = pygame.display.set_mode((manager.WIDTH, manager.HEIGHT))
+    screen = pygame.display.set_mode((manager.WIDTH, manager.HEIGHT), pygame.FULLSCREEN)
     clock = pygame.time.Clock()
     watch_server_socket.settimeout(4)
     watching = True
@@ -336,14 +332,11 @@ def recieve_screen(clients_list):
                     watching = False
                     pygame.quit()
                     send_selected_clients(manager.server_socket, clients_list, "watch_stop".encode())
-                    # watch_server_socket.sendto("watch_stop".encode(), watch_address)
                     break
             try:
                 size = int.from_bytes(socket_recv(watch_server_socket, MAX_BYTES), byteorder='big')
-                # print("1")
-                while size > 10000000:  # checks if it size and not part of the pixels
+                while size > 10000000:  # checks if it is a size and not part of the pixels
                     size = int.from_bytes(socket_recv(watch_server_socket, MAX_BYTES), byteorder='big')
-
                 temp_pixels = recvall(size)
                 pixels = decompress(temp_pixels)
                 # Create the Surface from raw pixels
@@ -362,14 +355,30 @@ def recieve_screen(clients_list):
         pass
 
 
+def get_subnet_mask(specific_ip):
+    # gets an ip address and returns the subnet mask of the internet adapter.
+    msg = subprocess.check_output("ipconfig", shell=False)
+    msg = msg.decode()
+    adapters = str(msg).split("\r\n\r\n")
+    for adp in adapters:
+        if adp.find(str(specific_ip)) != -1:
+            good_part = adp.split("\r\n")
+            for line in good_part:
+                if line.find("Subnet Mask") != -1:
+                    sbm = line.split(":")[1].strip()
+                    return sbm
+
+
 def turn_on_computers(clients_list):
+    # turn on the computers which in the list.
     turn_on_path = ".\\"
     with open(turn_on_path + "WakeOnLan.bat", "w+") as turn_on_file:
         for client_ip in clients_list:
             client_ip = client_ip[0]
             client_data = clients_table.return_client_by_ip(client_ip)
             client_mac = client_data[0][2]
-            turn_on_file.write('wolcmd ' + client_mac + ' ' + client_ip + ' ' + NETMASK + ' 7')
+            subnet_mask = get_subnet_mask(manager.server_local_ip)
+            turn_on_file.write('wolcmd ' + client_mac + ' ' + client_ip + ' ' + subnet_mask + ' 7')
     os.system(turn_on_path + "WakeOnLan.bat")
 
 
@@ -449,6 +458,8 @@ def send_commands():
             elif data == "watch_screen":
                 selected_clients_list = selected_clients_from_their_names(common.selected_clients)
                 send_selected_clients(manager.server_socket, selected_clients_list, "watch_screen".encode())
+                # window_client_thread = threading.Thread(target=recieve_screen, args=selected_clients_list)
+                # window_client_thread.start()
                 recieve_screen(selected_clients_list)
             elif data == "send_file":
                 print("send file")
@@ -560,6 +571,8 @@ class Server(Thread):
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.server_socket.bind((self.server_ip, self.port))
+        self.hostname = socket.gethostname()
+        self.server_local_ip = socket.gethostbyname(self.hostname)
         print('Listening at {}'.format(self.server_socket.getsockname()))
         commThread = Thread(target=send_commands, args=())
         commThread.start()
