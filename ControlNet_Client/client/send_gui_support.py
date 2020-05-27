@@ -53,7 +53,7 @@ def on_after_elapsed():
 def send_files():
     tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     tcp_client.connect((final.SERVER_IP, client_big_project.TCP_PORT2))
-    try: 
+    try:
         tcp_client.send(get(final.client_name).encode())
         print(filename)
         time.sleep(1.5)
@@ -80,6 +80,7 @@ def upload_files(p1):
     if filename != "":
         send_files_thread = threading.Thread(target=send_files, args=())
         send_files_thread.start()
+    file_explorer_root.destroy()
     # sys.stdout.flush()
 
 def destroy_window():

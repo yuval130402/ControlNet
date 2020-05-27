@@ -57,6 +57,7 @@ def get(pattern):
     for line in lines:
         parts = line.split(",")
         if str(parts[0]) == str(pattern):
+            read_con.close()
             return parts[1].strip("\n")
     read_con.close()
 

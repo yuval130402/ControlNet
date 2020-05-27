@@ -59,6 +59,8 @@ def lock_device(KeyWord):
         unlock()
 
 
+
+
 def lock_all():
     # lock mouse, keyboard and touch pad of the computer.
     # subprocess.Popen("devcon remove usb*")

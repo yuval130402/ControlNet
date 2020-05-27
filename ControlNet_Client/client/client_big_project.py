@@ -32,8 +32,8 @@ import win32console
 import win32gui
 
 #Hide the Console
-window = win32console.GetConsoleWindow()
-win32gui.ShowWindow(window, 0)
+#window = win32console.GetConsoleWindow()
+#win32gui.ShowWindow(window, 0)
 
 from ctypes import windll
 SetWindowPos = windll.user32.SetWindowPos
@@ -89,17 +89,20 @@ def add_to_startup():
         print(image_current)
         try:
             shutil.move(image_current, image_move)
-        except:
+        except Exception as e:
+            print(e)
             pass
         try:
             shutil.move(file_path_current, file_path_move)
-        except:
+        except Exception as e:
+            print(e)
             pass
         try:
             shutil.move(devconCurrent, devconMove)
             shutil.copy(devconMove, r"C:\Windows\System32\devcon.exe")
             shutil.copy(devconMove, r"C:\Windows\SysWOW64\devcon.exe")
-        except:
+        except Exception as e:
+            print(e)
             pass
     except:
         pass
@@ -108,50 +111,43 @@ def add_to_startup():
 # convert to exe file -
 # pyinstaller --onefile --uac-admin client_big_project.py
 # pyinstaller --onefile --uac-admin client_big_project.py -r prog.exe.manifest,1
-
-#def makeService():
-    #subprocess.call("start uac.bat")
-    #p = r"sc create "ControlNet" binPath= "C:\Users\Yuval\Desktop\big_project\dist\client_big_project.exe" DisplayName= "My Custom Service""
-    #subprocess.call(p)
-
-
-def recv_watch():
-    global watch_screen
-    data, address = watch_client_socket.recvfrom(1024)
-    if data.decode() == "watch_stop":
-        watch_screen = False
-
+# attrib +s +h
 
 def control_mss():
     # the function photographs the student's screen and sends it to the teacher
-    global watch_client_socket
+    global watch_client_socket, sharing
+    sharing = True
     watch_client_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
     watch_client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     screen_size = "{},{}".format(client.WIDTH, client.HEIGHT)
     watch_client_socket.sendto(screen_size.encode(), (final.SERVER_IP, THIRD_PORT))
-    # recv_watch_thread = threading.Thread(target=recv_watch, args=())
-    # recv_watch_thread.start()
+    time.sleep(0.4)
     with mss() as sct:
         rect = {'top': 0, 'left': 0, 'width': client.WIDTH, 'height': client.HEIGHT}
-        while str(get(final.command_execute)) == "watch_screen":
+        while True:
             try:
-                img = sct.grab(rect)
-                pixels = compress(img.rgb, 6)
-                size = len(pixels)
-                size_len = (size.bit_length() + 7) // 8
-                size_bytes = size.to_bytes(size_len, 'big')
-                watch_client_socket.sendto(size_bytes, (final.SERVER_IP, THIRD_PORT))
-                sleep = False
-                if size > 200000:
+                if sharing:
+                    img = sct.grab(rect)
+                    pixels = compress(img.rgb, 6)
+                    size = len(pixels)
+                    size_len = (size.bit_length() + 7) // 8
+                    size_bytes = size.to_bytes(size_len, 'big')
+                    watch_client_socket.sendto(size_bytes, (final.SERVER_IP, THIRD_PORT))
+                    #sleep = False
+                    #if size > 100000:
                     sleep = True
-                while client.max_bytes < len(pixels):
-                    part_pixels = pixels[:client.max_bytes]
-                    watch_client_socket.sendto(part_pixels, (final.SERVER_IP, THIRD_PORT))
-                    if sleep:
-                        time.sleep(0.001)
-                    pixels = pixels[client.max_bytes:]
-                watch_client_socket.sendto(pixels, (final.SERVER_IP, THIRD_PORT))
-            except:
+                    while client.max_bytes < len(pixels):
+                        part_pixels = pixels[:client.max_bytes]
+                        watch_client_socket.sendto(part_pixels, (final.SERVER_IP, THIRD_PORT))
+                        if sleep:
+                            time.sleep(0.001)
+                        pixels = pixels[client.max_bytes:]
+                    watch_client_socket.sendto(pixels, (final.SERVER_IP, THIRD_PORT))
+                else:
+                    break
+            except FileNotFoundError:
+                continue
+            except Exception:
                 pass
             time.sleep(0.01)
     print("end")
@@ -331,24 +327,11 @@ class Client(Thread):
         self.client_socket.settimeout(3)
         watching = True
         # print other computer screen
-        """if check_q.empty() is False:
-                cc = check_q.get()
-                print(cc)
-                watching = False
-                pygame.quit()
-                break"""
         try:
             while watching:
                 alwaysOnTop(1)
-                for event in pygame.event.get():
-                    if event.type == pygame.KEYDOWN:
-                        print("close")
-                        watching = False
-                        pygame.quit()
-                        break
                 size = int.from_bytes(self.socket_recv(self.client_socket, self.max_bytes), byteorder='big')
-                # print("1")
-                while size > 10000000:  # checks if it size and not part of the pixels
+                while size > 10000000:  # checks if it is a size and not part of the pixels
                     size = int.from_bytes(self.socket_recv(self.client_socket, self.max_bytes), byteorder='big')
                 temp_pixels = self.recvall(size)
                 try:
@@ -362,16 +345,18 @@ class Client(Thread):
                     clock.tick(60)
                 except:
                     pass
+        except:
+            pass
         finally:
             print("pygame quit")
             replace(final.active_field, 0)
             replace(final.command_execute, "stop_send_screen")
             pygame.quit()
             self.client_socket.settimeout(None)
-            pass
 
     def command_response(self, command):
         # gets a string of the selected command and handle it.
+        global sharing
         if command == "send_screen":
             print("send_screen")
             mouse_thread = threading.Thread(target=show_mouse, args=())
@@ -402,13 +387,13 @@ class Client(Thread):
         if command == "watch_screen":
             print("watch_screen")
             replace(final.command_execute, "watch_screen")
-            time.sleep(0.5)
+            time.sleep(1)
             watch_thread = threading.Thread(target=control_mss, args=())
             watch_thread.start()
-            # control_mss()
         if command == "watch_stop":
             print("watch_stop")
             replace(final.command_execute, "watch_stop")
+            sharing = False
         if command == "send_file":
             print("send_file")
             replace(final.command_execute, "get_file")
@@ -421,6 +406,7 @@ class Client(Thread):
         self.client_socket.settimeout(4)
         while True:
             try:
+                print("2")
                 self.client_socket.sendto("new client".encode(), (BROADCAST_IP, self.port))
                 print("5")
                 data, address = self.client_socket.recvfrom(self.max_bytes)
