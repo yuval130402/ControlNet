@@ -27,6 +27,9 @@ except ImportError:
     import tkinter.ttk as ttk
     py3 = True
 
+# convert to exe file -
+# pyinstaller --onefile gui_project_support.py
+
 def over_on(p1, btn):
     if btn == "Select_All":
         select_all["background"] = "#b7d2fd"

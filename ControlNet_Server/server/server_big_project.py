@@ -142,7 +142,7 @@ class Clients:
         conn.close()
 
 
-class ClientThread(Thread):
+class sendfileThread(Thread):
     def __init__(self, ip, port, sock):
         Thread.__init__(self)
         self.ip = ip
@@ -182,7 +182,7 @@ def send_files():
             print("Waiting for incoming connections...")
             (conn, (ip, port)) = tcpsock.accept()
             print('Got connection from ', (ip, port))
-            newthread = ClientThread(ip, port, conn)
+            newthread = sendfileThread(ip, port, conn)
             newthread.start()
             threads.append(newthread)
         except:
@@ -321,7 +321,7 @@ def recieve_screen(clients_list):
     pygame.init()
     screen = pygame.display.set_mode((manager.WIDTH, manager.HEIGHT), pygame.FULLSCREEN)
     clock = pygame.time.Clock()
-    watch_server_socket.settimeout(4)
+    watch_server_socket.settimeout(5)
     watching = True
     # print other computer screen
     try:
@@ -350,6 +350,7 @@ def recieve_screen(clients_list):
                 pass
     finally:
         print("quit watch screen")
+        send_selected_clients(manager.server_socket, clients_list, "watch_stop".encode())
         pygame.quit()
         watch_server_socket.close()
         pass
