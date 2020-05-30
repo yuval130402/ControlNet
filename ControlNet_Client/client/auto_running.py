@@ -87,8 +87,27 @@ def auto_run():
         print(elem)"""
 
 
-if __name__ == '__main__':
-    auto_run()
+try:
+    import httplib
+except:
+    import http.client as httplib
 
+
+def have_internet():
+    while True:
+        conn = httplib.HTTPConnection("www.google.com", timeout=5)
+        try:
+            conn.request("HEAD", "/")
+            conn.close()
+            print("True")
+        except:
+            conn.close()
+            print("False")
+        time.sleep(3)
+
+
+if __name__ == '__main__':
+    # auto_run()
+    have_internet()
 
 

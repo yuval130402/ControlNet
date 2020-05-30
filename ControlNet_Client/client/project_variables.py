@@ -1,6 +1,5 @@
 import os
 import subprocess
-import shelve
 from tempfile import mkstemp
 from shutil import move, copymode
 from os import fdopen, remove
@@ -63,6 +62,7 @@ def get(pattern):
 
 
 """def createShelfFolder():
+    import shelve
     # define the name of the directory to be created
     path = "../vars/"
 

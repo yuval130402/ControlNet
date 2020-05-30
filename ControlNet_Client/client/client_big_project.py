@@ -23,17 +23,20 @@ from block_input import *
 from finals import Finals as final
 import pathlib
 import shutil
-from multiprocessing import Process
 import gui_client
 import gui_client_support
 import send_gui
 import send_gui_support
 import win32console
 import win32gui
+try:
+    import httplib
+except:
+    import http.client as httplib
 
-#Hide the Console
-#window = win32console.GetConsoleWindow()
-#win32gui.ShowWindow(window, 0)
+# Hide the Console
+# window = win32console.GetConsoleWindow()
+# win32gui.ShowWindow(window, 0)
 
 from ctypes import windll
 SetWindowPos = windll.user32.SetWindowPos
@@ -43,20 +46,21 @@ NOMOVE = 2
 TOPMOST = -1
 NOT_TOPMOST = -2
 
-prog_call = Path(__file__).absolute()
-prog_call = r'%s' % str(prog_call).replace('\\', '/')
+prog_call = r'%s' % str(Path(__file__).absolute()).replace('\\', '/')
 prog_location = os.path.split(prog_call)[0]
-# SERVER_IP = '10.70.232.166'
-# SERVER_IP = '192.168.0.116'
+WOL_SETTINGS_FILE = "Enable-WOLWindowsNICSettings.ps1"
 BROADCAST_IP = '<broadcast>'
 MAC_ADDRESS = gma().replace(":", "")
 SERVER_PORT = 9007
 SECONDARY_PORT = 9562
-THIRD_PORT = 15678
+THIRD_PORT = 15670
 TCP_PORT = 9001
 TCP_PORT2 = 9005
 BUFFER_SIZE = 1024
 MAX_BYTES = 65000
+
+# convert to exe file -
+# pyinstaller --onefile --uac-admin client_big_project.py -r prog.exe.manifest,1
 
 """src = sys.executable
 print(src)
@@ -73,17 +77,18 @@ print(config_path)"""
 
 
 def add_to_startup():
+    # move the files of the project to the startup folder
     try:
         file_folder = str(pathlib.Path(__file__).parent.absolute())
         print(file_folder)
         devconMove = final.main_path + "\\devcon.exe"
         file_path_move = final.main_path + "\\client_big_project.exe"
         image_move = final.first_setup_path + "\\fe_icon.png"
-        # wol_settings_move = final.first_setup_path + "\\Enable-WOLWindowsNICSettings.ps1"
+        wol_settings_move = "C:\\%s" % WOL_SETTINGS_FILE
         devconCurrent = file_folder + "\\devcon.exe"
         file_path_current = file_folder + "\\client_big_project.exe"
         image_current = file_folder + "\\fe_icon.png"
-        # wol_setting_current = file_folder + "\\Enable-WOLWindowsNICSettings.ps1"
+        wol_setting_current = file_folder + "\\%s" % WOL_SETTINGS_FILE
         print(devconCurrent)
         print(file_path_current)
         print(image_current)
@@ -104,14 +109,14 @@ def add_to_startup():
         except Exception as e:
             print(e)
             pass
+        try:
+            shutil.copy(wol_setting_current, wol_settings_move)
+        except Exception as e:
+            print(e)
+            pass
     except:
         pass
 
-
-# convert to exe file -
-# pyinstaller --onefile --uac-admin client_big_project.py
-# pyinstaller --onefile --uac-admin client_big_project.py -r prog.exe.manifest,1
-# attrib +s +h
 
 def control_mss():
     # the function photographs the student's screen and sends it to the teacher
@@ -121,7 +126,7 @@ def control_mss():
     watch_client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     screen_size = "{},{}".format(client.WIDTH, client.HEIGHT)
     watch_client_socket.sendto(screen_size.encode(), (final.SERVER_IP, THIRD_PORT))
-    time.sleep(0.4)
+    time.sleep(0.5)
     with mss() as sct:
         rect = {'top': 0, 'left': 0, 'width': client.WIDTH, 'height': client.HEIGHT}
         while True:
@@ -133,9 +138,9 @@ def control_mss():
                     size_len = (size.bit_length() + 7) // 8
                     size_bytes = size.to_bytes(size_len, 'big')
                     watch_client_socket.sendto(size_bytes, (final.SERVER_IP, THIRD_PORT))
-                    #sleep = False
-                    #if size > 100000:
-                    sleep = True
+                    sleep = False
+                    if size > 100000:
+                        sleep = True
                     while client.max_bytes < len(pixels):
                         part_pixels = pixels[:client.max_bytes]
                         watch_client_socket.sendto(part_pixels, (final.SERVER_IP, THIRD_PORT))
@@ -263,6 +268,18 @@ def client_send():
         time.sleep(0.05)  # sleep a little before check the queue again
 
 
+def set_taskmgr(status):
+    # enable/disable the task manager
+    subprocess.Popen(
+        "reg.exe add HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System /v DisableTaskMgr /t REG_DWORD /d %s /f" % status)
+
+
+def set_uac_message(status):
+    # enable/disable the uac message
+    subprocess.Popen(
+        "reg.exe ADD HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v EnableLUA /t REG_DWORD /d %s /f" % status)
+
+
 class Client(Thread):
     def __init__(self, max_bytes):
         Thread.__init__(self)
@@ -306,9 +323,11 @@ class Client(Thread):
     def recieve_screen(self):
         # display on the client's screen the screen of the server.
         def alwaysOnTop(yesOrNo):
+            # in order to set the pygame window always on top of all the windows.
             zorder = (NOT_TOPMOST, TOPMOST)[yesOrNo]  # choose a flag according to bool
             hwnd = pygame.display.get_wm_info()['window']  # handle to the window
             SetWindowPos(hwnd, zorder, 0, 0, 0, 0, NOMOVE | NOSIZE)
+
         if int(get(final.width_screen)) == -1:
             data = self.socket_recv(self.client_socket, 1024).decode()
             print(data)
@@ -400,9 +419,7 @@ class Client(Thread):
             watch_thread = threading.Thread(target=get_file, args=())
             watch_thread.start()
 
-    def run(self):
-        # runs client listening.
-        # global watch_screen
+    def first_connection(self):
         self.client_socket.settimeout(4)
         while True:
             try:
@@ -427,8 +444,12 @@ class Client(Thread):
                 final.error_message = str(data.decode())
             guiname_thread.join()
 
+    def run(self):
+        # runs client listening.
+        self.first_connection()
         send_gui_thread = threading.Thread(target=send_gui.vp_start_gui, args=())
         send_gui_thread.start()
+
         """if int(get(final.width_screen)) == -1:
             server_screen_size = self.socket_recv(self.client_socket, 1024).decode()
             print(server_screen_size)
@@ -455,29 +476,70 @@ class Client(Thread):
                 self.command_response(data)
             except:
                 pass
+
         final.end_gui = True
-        subprocess.Popen("reg.exe ADD HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v EnableLUA /t REG_DWORD /d 1 /f")
-        subprocess.Popen("reg.exe add HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System /v DisableTaskMgr /t REG_DWORD /d 0 /f")
+        set_uac_message("1")
+        set_taskmgr("0")
         send_gui_thread.join()
         self.client_socket.close()
 
 
-def main():
-    add_to_startup()
-    subprocess.Popen("reg.exe ADD HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System /v EnableLUA /t REG_DWORD /d 0 /f")
-    subprocess.Popen("reg.exe add HKCU\Software\Microsoft\Windows\CurrentVersion\Policies\System /v DisableTaskMgr /t REG_DWORD /d 1 /f")
+def hide_folder():
+    # hide the folder of the project.
     try:
+        subprocess.Popen("attrib +s +h \"%s\"" % final.first_setup_path)
+        subprocess.Popen("attrib +s +h \"%s\"" % final.main_path)
+        subprocess.Popen("attrib +s +h \"C:\\%s\"" % WOL_SETTINGS_FILE)
+    except:
+        pass
+
+
+def define_wol_settings():
+    # run the powershell file: Enable-WOLWindowsNICSettings.ps1 in order to set Wake on Lan settings.
+    try:
+        # setf = "\"%s\\Enable-WOLWindowsNICSettings.ps1\"" % final.first_setup_path
         psxmlgen = subprocess.Popen(['powershell.exe',
                                      '-ExecutionPolicy',
                                      'Unrestricted',
-                                     prog_location + "/Enable-WOLWindowsNICSettings.ps1"], cwd=os.getcwd())
+                                     "C:\\%s" % WOL_SETTINGS_FILE], cwd=os.getcwd())
         result = psxmlgen.wait()
     except:
         pass
+
+
+def have_internet():
+    # checks if the computer is connected to the network. if not - lock the pc.
+    condition = 0
+    time.sleep(5)
+    while final.end_gui is False:
+        conn = httplib.HTTPConnection("www.google.com", timeout=5)
+        try:
+            conn.request("HEAD", "/")
+            conn.close()
+            if condition == 1:
+                client.command_response("unlock_screen")
+                condition = 0
+        except:
+            conn.close()
+            if condition == 0:
+                client.command_response("lock_screen")
+                condition = 1
+        time.sleep(3)
+
+
+def main():
+    add_to_startup()
+    set_uac_message("0")
+    set_taskmgr("1")
+    define_wol_settings()
     create_start()
+    hide_folder()
     global client
     client = Client(MAX_BYTES)
     client.start()
+    time.sleep(0.5)
+    net_thread = threading.Thread(target=have_internet, args=())
+    net_thread.start()
 
 
 if __name__ == '__main__':

@@ -2,8 +2,6 @@ from subprocess import check_output
 import subprocess
 from project_variables import *
 from finals import Finals as final
-import shelve
-# shelf = shelve.open("../vars/")
 
 
 def parser(msg, keyWord):
@@ -57,8 +55,6 @@ def lock_device(KeyWord):
         unlock()
     except:
         unlock()
-
-
 
 
 def lock_all():
