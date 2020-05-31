@@ -19,19 +19,39 @@ import os
 import tkinter as tk
 from tkinter import filedialog
 import subprocess
+from pathlib import Path
 
 clients = set()
-SERVER_IP = '0.0.0.0'
-BROADCAST_IP = '10.70.235.252'
-# BROADCAST_IP = '10.70.235.255'
-SERVER_PORT = 9007
-SECONDARY_PORT = 9562
-THIRD_PORT = 15670
-TCP_PORT = 9001
-TCP_PORT2 = 9005
 BUFFER_SIZE = 1024
 MAX_BYTES = 65000
 files_from_clients_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 'Desktop') + '\\ControlNet_files\\'
+# prog_path = r'%s' % str(Path(__file__).absolute()).replace('\\', '/')
+# prog_parent = str(Path(__file__).parent.absolute())
+prog_call = sys.argv[0]
+prog_parent = os.path.split(prog_call)[0]
+print(prog_parent + "\\network_data.txt")
+
+
+def get_network_data(pattern):
+    read_con = open(prog_parent + "\\network_data.txt", "r")
+    content = read_con.read()
+    lines = content.split("\n")
+    for line in lines:
+        parts = line.split(",")
+        if str(parts[0]) == str(pattern):
+            read_con.close()
+            return parts[1].strip("\n")
+    read_con.close()
+
+
+class NetworkData:
+    BROADCAST_IP = '<broadcast>'
+    SERVER_IP = str(get_network_data("SERVER_IP"))
+    SERVER_PORT = int(get_network_data("SERVER_PORT"))
+    SECONDARY_PORT = int(get_network_data("SECONDARY_PORT"))
+    THIRD_PORT = int(get_network_data("THIRD_PORT"))
+    TCP_PORT = int(get_network_data("TCP_PORT"))
+    TCP_PORT2 = int(get_network_data("TCP_PORT2"))
 
 
 class Clients:
@@ -172,7 +192,7 @@ class sendfileThread(Thread):
 def send_files():
     tcpsock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     tcpsock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    tcpsock.bind((SERVER_IP, TCP_PORT))
+    tcpsock.bind((NetworkData.SERVER_IP, NetworkData.TCP_PORT))
     tcpsock.settimeout(6)
     threads = []
 
@@ -268,7 +288,7 @@ def mouse_listener():
         start_mouse_socket = 1
         mouse_server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         mouse_server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        mouse_server_socket.bind((SERVER_IP, SECONDARY_PORT))
+        mouse_server_socket.bind((NetworkData.SERVER_IP, NetworkData.SECONDARY_PORT))
     print('Listening at {}'.format(mouse_server_socket.getsockname()))
     mouse_server_socket.settimeout(5)
     mouse_recv_thread = Thread(target=mouse_recv, args=())
@@ -306,7 +326,7 @@ def recieve_screen(clients_list):
     start_watch_socket = 1
     watch_server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     watch_server_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-    watch_server_socket.bind((SERVER_IP, THIRD_PORT))
+    watch_server_socket.bind((NetworkData.SERVER_IP, NetworkData.THIRD_PORT))
     try:
         data, watch_address = watch_server_socket.recvfrom(1024)
         print(data)
@@ -478,6 +498,7 @@ def send_commands():
                 clients_table.delete_clients()
                 end_server = True
                 manager.server_socket.close()
+                os._exit(1)
                 break
         time.sleep(0.01)
 
@@ -498,7 +519,7 @@ class getfileThread(Thread):
         print(file_path)
         file_name = os.path.split(file_path)[1]
         self.path = self.path + client_name + "\\"
-        create_vars_folder(self.path)
+        create_folder(self.path)
         print(file_name)
         print(self.path)
         with open(self.path + file_name, 'wb') as f:
@@ -520,7 +541,7 @@ def get_file():
     end_server = False
     server_getfile_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_getfile_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-    server_getfile_sock.bind((SERVER_IP, TCP_PORT2))
+    server_getfile_sock.bind((NetworkData.SERVER_IP, NetworkData.TCP_PORT2))
     server_getfile_sock.settimeout(6)
     threads = []
 
@@ -544,7 +565,7 @@ def get_file():
     server_getfile_sock.close()
 
 
-def create_vars_folder(path):
+def create_folder(path):
     # define the name of the directory to be created
     try:
         os.mkdir(path)
@@ -564,9 +585,8 @@ class Server(Thread):
         self.width = -1
         self.height = -1
         self.max_bytes = max_bytes
-        self.server_ip = SERVER_IP
-        self.broadcast_ip = (BROADCAST_IP, 9006)
-        self.port = SERVER_PORT
+        self.server_ip = NetworkData.SERVER_IP
+        self.port = NetworkData.SERVER_PORT
         self.address = ""
         # create socket
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -596,7 +616,6 @@ class Server(Thread):
                     clients.add(new_address)
                     clients_table.insert_client(new_name, str(new_address[0]), new_mac)
                     print("client was added")
-                    # common.gui_q.put(" " + new_name + "  " + str(new_address[0]))
                     common.gui_q.put(" " + new_name)
                     self.server_socket.sendto("welcome".encode(), new_address)
                     """time.sleep(0.2)
@@ -638,7 +657,7 @@ def main():
     global manager
     global clients_table
     try:
-        create_vars_folder(files_from_clients_path)
+        create_folder(files_from_clients_path)
     except:
         pass
     getfiles_thread = Thread(target=get_file, args=())
