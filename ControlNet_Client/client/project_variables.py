@@ -13,12 +13,8 @@ this are the funcs
 
 def create_vars_folder(path):
     # define the name of the directory to be created
-
     try:
         os.mkdir(path)
-    except OSError:
-        print("Creation of the directory %s failed" % path)
-    else:
         print("Successfully created the directory %s " % path)
         if path == str(final.first_setup_path):
             create_var(final.active_field, 0)
@@ -26,6 +22,9 @@ def create_vars_folder(path):
             create_var(final.width_screen, -1)
             create_var(final.height_screen, -1)
             create_var(final.client_name, "")
+    except OSError:
+        print("Creation of the directory %s failed" % path)
+
 
 
 def create_var(var, value):
@@ -59,29 +58,6 @@ def get(pattern):
             read_con.close()
             return parts[1].strip("\n")
     read_con.close()
-
-
-"""def createShelfFolder():
-    import shelve
-    # define the name of the directory to be created
-    path = "../vars/"
-
-    try:
-        os.mkdir(path)
-    except OSError:
-        print("Creation of the directory %s failed" % path)
-    else:
-        print("Successfully created the directory %s " % path)
-        try:
-            path += "vars.txt"
-            f = open(path, "a")
-            f.close()
-            shelf = shelve.open("../vars/")  # directory for text file to save the vars
-            shelf['activation'] = False
-            shelf['active_flag'] = 0
-            shelf['command_execute'] = ""
-        except OSError:
-            print("Creation of the directory %s failed" % path)"""
 
 
 def create_start():

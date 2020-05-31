@@ -3,7 +3,6 @@ from queue import Queue
 
 
 class Finals:
-    SERVER_IP = ""
     conn_q = Queue()
     check_q = Queue()
     USER_NAME = os.environ["USERNAME"]

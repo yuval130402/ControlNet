@@ -26,7 +26,7 @@ from threading import Thread
 from socket import socket
 import socket
 from project_variables import *
-import client_big_project
+from client_big_project import NetworkData, BUFFER_SIZE
 import time
 
 def exb():
@@ -52,7 +52,7 @@ def on_after_elapsed():
 
 def send_files():
     tcp_client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    tcp_client.connect((final.SERVER_IP, client_big_project.TCP_PORT2))
+    tcp_client.connect((NetworkData.SERVER_IP, NetworkData.TCP_PORT2))
     try:
         tcp_client.send(get(final.client_name).encode())
         print(filename)
@@ -60,11 +60,11 @@ def send_files():
         tcp_client.send(filename.encode())
         f = open(filename, 'rb')
         while True:
-            l = f.read(client_big_project.BUFFER_SIZE)
+            l = f.read(BUFFER_SIZE)
             while (l):
                 tcp_client.send(l)
                 # print('Sent ',repr(l))
-                l = f.read(client_big_project.BUFFER_SIZE)
+                l = f.read(BUFFER_SIZE)
             if not l:
                 f.close()
                 tcp_client.close()
