@@ -99,7 +99,8 @@ class NetworkData:
 def add_to_startup():
     # move the files of the project to the startup folder
     try:
-        file_folder = str(pathlib.Path(__file__).parent.absolute())
+        # file_folder = str(pathlib.Path(__file__).parent.absolute())
+        file_folder = prog_location
         print(file_folder)
         devconMove = final.main_path + "\\devcon.exe"
         file_path_move = final.main_path + "\\client_big_project.exe"
