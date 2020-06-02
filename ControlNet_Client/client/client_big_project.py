@@ -97,7 +97,7 @@ class NetworkData:
 
 
 def add_to_startup():
-    # move the files of the project to the startup folder
+    # copy the files of the project to the startup folder
     try:
         # file_folder = str(pathlib.Path(__file__).parent.absolute())
         file_folder = prog_location
