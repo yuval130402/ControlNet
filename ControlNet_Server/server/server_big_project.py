@@ -20,6 +20,8 @@ import tkinter as tk
 from tkinter import filedialog
 import subprocess
 from pathlib import Path
+import win32console
+import win32gui
 
 clients = set()
 BUFFER_SIZE = 1024
@@ -30,6 +32,10 @@ files_from_clients_path = os.path.join(os.path.join(os.environ['USERPROFILE']), 
 prog_call = sys.argv[0]
 prog_parent = os.path.split(prog_call)[0]
 print(prog_parent + "\\network_data.txt")
+
+# Hide the Console
+window = win32console.GetConsoleWindow()
+win32gui.ShowWindow(window, 0)
 
 
 def get_network_data(pattern):
